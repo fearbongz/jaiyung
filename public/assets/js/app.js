@@ -598,31 +598,27 @@
 
   function expenseDonutHtml(){
     var key=monthKey(viewYear,viewMonth),groups={},total=0,colors=['var(--coral)','var(--sky)','var(--mustard)','var(--plum)','var(--mint)','#9b7653','#7d8b91'];
-    state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id],amount=Number(pay&&pay.paid?pay.amount:bill.amount)||0;groups[bill.category]=(groups[bill.category]||0)+amount;total+=amount;});
+    function reportCategory(bill){
+      var name=String(bill.name||'').toLowerCase();
+      if(/ไฟ/.test(name))return 'elec';
+      if(/น้ำ/.test(name))return 'water';
+      if(/บัตร|เครดิต|card|shopee|lazada|spay|kkp/.test(name))return 'card';
+      if(/คอนโด|ค่าเช่า|ห้อง/.test(name))return 'rent';
+      if(/เน็ต|อินเทอร์เน็ต|มือถือ|โทรศัพท์/.test(name))return 'net';
+      if(/ประกัน/.test(name))return 'ins';
+      return bill.category||'other';
+    }
+    state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id],amount=Number(pay&&pay.paid?pay.amount:bill.amount)||0,category=reportCategory(bill);groups[category]=(groups[category]||0)+amount;total+=amount;});
     var entries=Object.keys(groups).sort(function(a,b){return groups[b]-groups[a];}),cursor=0,stops=[];
     entries.forEach(function(id,index){var end=cursor+(total?groups[id]/total*100:0);stops.push(colors[index%colors.length]+' '+cursor+'% '+end+'%');cursor=end;});
     var legend=entries.map(function(id,index){return '<div class="donut-row"><span><i style="background:'+colors[index%colors.length]+'"></i>'+escapeHtml(catInfo(id).name)+'</span><strong>'+fmtBaht(groups[id])+'</strong></div>';}).join('');
     return '<div class="expense-donut-wrap"><div class="expense-donut" style="background:conic-gradient('+(stops.join(',')||'var(--card-2) 0 100%')+')"><div><strong>'+fmtBaht(total)+'</strong><small>รายจ่ายเดือนนี้</small></div></div><div class="donut-legend">'+legend+'</div></div>';
   }
 
-  function disciplineHeatmapHtml(){
-    var end=new Date(today.getFullYear(),today.getMonth(),today.getDate()),start=new Date(end);start.setDate(end.getDate()-370);var marks={};
-    function mark(date,status){var key=date.toISOString().slice(0,10);if(marks[key]!=='late')marks[key]=status;}
-    function scan(items,payments,isLoan){
-      for(var cursor=new Date(start.getFullYear(),start.getMonth(),1);cursor<=end;cursor.setMonth(cursor.getMonth()+1)){
-        var y=cursor.getFullYear(),m=cursor.getMonth(),key=monthKey(y,m);
-        items.forEach(function(item){if(isLoan&&!isLoanActiveInMonth(item,y,m))return;var due=new Date(y,m,Math.min(item.dueDay,daysInMonth(y,m))),pay=(payments[key]||{})[item.id];if(pay&&pay.paid){var paidAt=new Date(pay.paidAt||due);mark(due,paidAt<=due?'ontime':'late');}else if(due<end)mark(due,'late');});
-      }
-    }
-    scan(state.bills,state.payments,false);scan(state.loans,state.loanPayments,true);
-    var cells='';for(var date=new Date(start);date<=end;date.setDate(date.getDate()+1)){var key=date.toISOString().slice(0,10);cells+='<i class="heat-cell '+(marks[key]||'empty')+'" title="'+date.toLocaleDateString('th-TH')+'"></i>';}
-    return '<div class="heat-scroll"><div class="payment-heatmap">'+cells+'</div></div><div class="heat-legend"><span><i class="heat-cell ontime"></i>ตรงเวลา</span><span><i class="heat-cell late"></i>ช้า/ยังไม่จ่าย</span></div>';
-  }
-
   function reportOverviewHtml(loans){
     var current=monthPaidTotal(viewYear,viewMonth),prevDate=new Date(viewYear,viewMonth-1,1),previous=monthPaidTotal(prevDate.getFullYear(),prevDate.getMonth());
     var original=state.loans.reduce(function(sum,l){return sum+Math.max(Number(l.totalAmount||0),Number(l.remaining||0));},0),remaining=state.loans.reduce(function(sum,l){return sum+Number(l.remaining||0);},0),pct=original?Math.max(0,Math.min(100,Math.round((original-remaining)/original*100))):0;
-    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card"><div class="section-kicker">MONTH ON MONTH</div><h3>จ่ายรวมเดือนนี้</h3><div class="report-number">'+fmtBaht(current)+'</div>'+comparisonHtml(current,previous)+'</div><div class="debt-summary-card lifetime-card"><div class="lifetime-ring" style="--progress:'+(pct*3.6)+'deg"><div><strong>'+pct+'%</strong><small>ปลดหนี้แล้ว</small></div></div><p>จากหนี้ทั้งหมดที่เคยมี '+fmtBaht(original)+'</p></div></div><div class="debt-summary-card"><div class="section-kicker">PAYMENT DISCIPLINE</div><h3>วินัยการจ่ายย้อนหลัง 1 ปี</h3>'+disciplineHeatmapHtml()+'</div>';
+    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card"><div class="section-kicker">MONTH ON MONTH</div><h3>จ่ายรวมเดือนนี้</h3><div class="report-number">'+fmtBaht(current)+'</div>'+comparisonHtml(current,previous)+'</div><div class="debt-summary-card lifetime-card"><div class="lifetime-ring" style="--progress:'+(pct*3.6)+'deg"><div><strong>'+pct+'%</strong><small>ปลดหนี้แล้ว</small></div></div><p>จากหนี้ทั้งหมดที่เคยมี '+fmtBaht(original)+'</p></div></div>';
   }
 
   function renderDebtSummary(){
