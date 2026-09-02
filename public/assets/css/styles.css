@@ -23,12 +23,12 @@
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --paper:#211D19;
-      --card:#2B2521;
-      --card-2:#332C26;
+      --card:#312A25;
+      --card-2:#3A322B;
       --ink:#F3ECDF;
-      --ink-soft:#B8AC97;
-      --ink-faint:#7E7566;
-      --line:#453C33;
+      --ink-soft:#D5C9B5;
+      --ink-faint:#A89C89;
+      --line:#615448;
       --coral:#E8809A;
       --coral-soft:#4A2A32;
       --mint:#7EC79A;
@@ -45,12 +45,12 @@
   }
   :root[data-theme="dark"]{
     --paper:#211D19;
-    --card:#2B2521;
-    --card-2:#332C26;
+    --card:#312A25;
+    --card-2:#3A322B;
     --ink:#F3ECDF;
-    --ink-soft:#B8AC97;
-    --ink-faint:#7E7566;
-    --line:#453C33;
+    --ink-soft:#D5C9B5;
+    --ink-faint:#A89C89;
+    --line:#615448;
     --coral:#E8809A;
     --coral-soft:#4A2A32;
     --mint:#7EC79A;
@@ -232,7 +232,7 @@
     box-shadow:var(--shadow);
     cursor:pointer;
   }
-  .bill.paid{opacity:0.6;}
+  .bill.paid{opacity:0.76;}
   .bicon{
     width:42px;height:42px;
     border-radius:50%;
