@@ -624,7 +624,7 @@
       if(/คอนโด|ค่าเช่า|ห้อง/.test(name))return 'rent';
       if(/เน็ต|อินเทอร์เน็ต|มือถือ|โทรศัพท์/.test(name))return 'net';
       if(/ประกัน/.test(name))return 'ins';
-      return bill.category||'other';
+      return 'other';
     }
     state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id];if(!pay||!pay.paid)return;var amount=Number(pay.amount||0),category=reportCategory(bill);groups[category]=(groups[category]||0)+amount;total+=amount;});
     var entries=Object.keys(groups).sort(function(a,b){return groups[b]-groups[a];}),cursor=0,stops=[];
