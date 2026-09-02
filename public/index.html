@@ -170,6 +170,11 @@
       <div class="subnote" id="lMonthOverrideNote">ใช้กับสินเชื่อแบบขั้นบันได ใส่เฉพาะเดือนที่ยอดต่างจากปกติ</div>
     </div>
     <div class="field">
+      <label>ตารางค่างวดขั้นบันได — ไม่บังคับ</label>
+      <textarea id="lPaymentSchedule" rows="4" placeholder="2026-10 = 7500&#10;2026-11 = 9000"></textarea>
+      <div class="subnote">หนึ่งเดือนต่อหนึ่งบรรทัด รูปแบบ ปี-เดือน = จำนวนเงิน</div>
+    </div>
+    <div class="field">
       <label>อัตราดอกเบี้ยต่อปี (% ต่อปี)</label>
       <input type="number" id="lInterestRate" placeholder="เช่น 6.5" min="0" max="100" step="0.01">
       <div class="subnote">คำนวณแบบลดต้นลดดอก หากไม่มีดอกเบี้ยให้ใส่ 0</div>
@@ -178,6 +183,14 @@
       <label>เดือนเริ่มชำระ — ไม่บังคับ</label>
       <input type="month" id="lStartMonth">
       <div class="subnote">สินเชื่อจะแสดงตั้งแต่เดือนนี้เป็นต้นไป หากไม่ใส่จะใช้เดือนที่เพิ่มรายการ</div>
+    </div>
+    <div class="field">
+      <label>ค่าปิดก่อนกำหนด (บาท) — ไม่บังคับ</label>
+      <input type="number" id="lPrepaymentFee" placeholder="0" min="0" step="1">
+    </div>
+    <div class="field">
+      <label>เงื่อนไขปิดก่อนกำหนด — ไม่บังคับ</label>
+      <input type="text" id="lPrepaymentNote" placeholder="เช่น ฟรีหลังผ่อนครบ 3 ปี">
     </div>
     <div class="field">
       <label>ครบกำหนดชำระวันที่ (1–31 ของเดือน)</label>
@@ -226,9 +239,12 @@
       <div class="detail-row"><span class="lab">เริ่มชำระ</span><span class="val" id="detailStartMonth">-</span></div>
       <div class="detail-row"><span class="lab">ดอกเบี้ยงวดถัดไป</span><span class="val" id="detailNextInterest">-</span></div>
       <div class="detail-row"><span class="lab">ดอกเบี้ยคงเหลือโดยประมาณ</span><span class="val" id="detailEstimatedInterest">-</span></div>
+      <div class="detail-row"><span class="lab">ค่าปิดก่อนกำหนด</span><span class="val" id="detailPrepaymentFee">-</span></div>
+      <div class="detail-row" id="detailPrepaymentNoteRow" style="display:none;"><span class="lab">เงื่อนไขการปิด</span><span class="val" id="detailPrepaymentNote">-</span></div>
       <div class="detail-row"><span class="lab">ครบกำหนดชำระ</span><span class="val" id="detailDue">-</span></div>
       <div class="detail-row" id="detailNoteRow" style="display:none;"><span class="lab">โน้ต</span><span class="val" id="detailNote">-</span></div>
     </div>
+    <div class="payment-history" id="detailPaymentHistory"></div>
     <div id="detailConfirmArea"></div>
     <div class="sheet-actions">
       <button class="btn ghost" id="detailPayBtn">จ่ายงวดยัง?</button>
@@ -250,6 +266,23 @@
     </div>
     <div class="sheet-actions">
       <button class="btn primary" id="saveBudgetBtn">บันทึก</button>
+    </div>
+    <div class="sec-block">
+      <h3>การแจ้งเตือน</h3>
+      <div class="field"><label>เตือนก่อนครบกำหนดกี่วัน</label><input type="number" id="fReminderDays" min="0" max="30" value="3"></div>
+      <button class="btn ghost" id="enableNotificationsBtn" style="width:100%;">เปิดการแจ้งเตือนบนอุปกรณ์นี้</button>
+    </div>
+    <div class="sec-block">
+      <h3>สำรองและนำข้อมูลออก</h3>
+      <div class="sheet-actions">
+        <button class="btn ghost" id="exportJsonBtn">สำรอง JSON</button>
+        <button class="btn ghost" id="exportCsvBtn">ส่งออก CSV</button>
+      </div>
+      <div class="sheet-actions">
+        <button class="btn ghost" id="printReportBtn">พิมพ์ / PDF</button>
+        <button class="btn ghost" id="importJsonBtn">นำเข้า JSON</button>
+      </div>
+      <input type="file" id="importJsonFile" accept="application/json" hidden>
     </div>
     <div class="sec-block" id="securitySection"></div>
     <p style="font-size:12px; color:var(--ink-soft); margin-top:18px; line-height:1.6;">

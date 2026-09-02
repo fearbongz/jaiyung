@@ -23,3 +23,11 @@ php -S 127.0.0.1:4173 -t public
 - `public/assets/js/app.js` — การทำงานของหน้าเว็บและ Supabase client
 - `public/supabase-config.js` — URL และ publishable key ของ Supabase
 - `database/supabase-schema.sql` — migration สำหรับตารางและ RLS policies
+
+## ตรวจสอบการคำนวณ
+
+```bash
+node tests/loan-interest.test.cjs
+```
+
+ชุดทดสอบครอบคลุมดอกเบี้ยลดต้นลดดอก ค่างวดขั้นบันได เดือนเริ่มชำระ และเครื่องจำลองเงินโปะ
