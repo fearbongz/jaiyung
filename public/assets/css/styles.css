@@ -324,7 +324,7 @@
   /* fab */
   .fab{
     position:fixed;
-    right:20px; bottom:24px;
+    right:max(20px, calc((100vw - 520px) / 2 + 18px)); bottom:24px;
     width:56px;height:56px;
     border-radius:50%;
     background:var(--coral);
