@@ -485,7 +485,6 @@
     listArea.innerHTML =
       '<div class="summary-hero"><div class="summary-eyebrow">ภาพรวมหนี้ของคุณ</div><div class="summary-total">'+fmtBaht(totalDebt)+'</div><div class="summary-caption">ยอดหนี้คงเหลือทั้งหมด</div><div class="summary-chips"><span>จ่ายเดือนนี้ <strong>'+fmtBaht(totalPayment)+'</strong></span><span>ดอก/เดือน <strong>'+fmtBaht(monthlyInterest)+'</strong></span></div></div>'+
       '<div class="debt-summary-card"><div class="section-kicker">DEBT MAP</div><h3>หนี้อยู่ตรงไหนบ้าง</h3><div class="debt-bars">'+debtBars+'</div></div>'+
-      '<div class="debt-summary-card"><div class="section-kicker">PAYOFF PLAN</div><h3>เส้นทางเคลียร์หนี้</h3><div class="payoff-flow"><div><b>1</b><span>จ่ายขั้นต่ำ<br>ทุกก้อน</span></div><i>→</i><div class="focus"><b>2</b><span>โปะ <strong>'+escapeHtml(expensive.name)+'</strong><br>ดอกสูงสุด</span></div><i>→</i><div><b>3</b><span>ปิดแล้วทบ<br>ไปก้อนถัดไป</span></div></div></div>'+
       '<div class="debt-summary-card"><h3>ตัวเลขสำคัญ</h3><div class="debt-summary-grid">'+
         '<div class="debt-metric"><span class="lab">หนี้คงเหลือรวม</span><span class="val">'+fmtBaht(totalDebt)+'</span></div>'+
         '<div class="debt-metric"><span class="lab">ต้องจ่ายเดือนนี้</span><span class="val">'+fmtBaht(totalPayment)+'</span></div>'+

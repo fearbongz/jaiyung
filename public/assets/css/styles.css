@@ -385,11 +385,6 @@
   .debt-bar-fill{height:100%;border-radius:10px;background:var(--plum);}
   .debt-bar-fill.color-1{background:var(--coral)}.debt-bar-fill.color-2{background:var(--mustard)}.debt-bar-fill.color-3{background:var(--sky)}.debt-bar-fill.color-4{background:var(--mint)}
   .debt-bar-meta{font-size:10px;color:var(--ink-soft);margin-top:4px;}
-  .payoff-flow{display:flex;align-items:stretch;justify-content:space-between;gap:6px;margin-top:15px;}
-  .payoff-flow>div{flex:1;text-align:center;background:var(--card-2);padding:12px 5px;border-radius:14px;font-size:10px;}
-  .payoff-flow>div.focus{background:var(--plum-soft);color:var(--plum);}
-  .payoff-flow b{width:24px;height:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 7px;border-radius:50%;background:var(--card);color:var(--plum);}
-  .payoff-flow i{align-self:center;color:var(--ink-faint);font-style:normal;font-weight:800;}
   .priority-list{display:flex;flex-direction:column;gap:9px;margin-top:12px;}
   .priority-item{display:flex;justify-content:space-between;gap:12px;padding:12px;background:var(--card-2);border-radius:14px;align-items:center;}
   .priority-rank{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--plum);color:#fff;border-radius:9px;font-size:12px;font-weight:800;flex:0 0 auto;}
