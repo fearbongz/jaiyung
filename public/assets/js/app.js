@@ -89,7 +89,7 @@
   var today = new Date();
   var viewYear = today.getFullYear();
   var viewMonth = today.getMonth(); // 0-11
-  var activeTab = 'bills'; // 'bills' | 'loans'
+  var activeTab = 'dashboard';
 
   var MONTH_NAMES = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
@@ -139,6 +139,27 @@
       if(initialMinimum+Number(extraMonthly||0)<=0)break;
     }
     return {months:months,totalInterest:totalInterest,complete:!debts.some(function(d){return d.remaining>.01;})};
+  }
+  function debtTimeline(sourceLoans,extraMonthly,windfall){
+    var debts=sourceLoans.filter(function(l){return Number(l.remaining||0)>0;}).map(function(l){return {remaining:Number(l.remaining||0),payment:Number(l.monthlyPayment||0),rate:Number(l.interestRate||0)};}).sort(function(a,b){return b.rate-a.rate;});
+    var monthlyBudget=debts.reduce(function(s,d){return s+d.payment;},0)+Math.max(0,Number(extraMonthly)||0),cash=Math.max(0,Number(windfall)||0);
+    while(cash>0){var first=debts.find(function(d){return d.remaining>0;});if(!first)break;var used=Math.min(cash,first.remaining);first.remaining-=used;cash-=used;}
+    var values=[debts.reduce(function(s,d){return s+d.remaining;},0)];
+    for(var month=0;month<360&&values[values.length-1]>.01;month++){
+      var available=monthlyBudget;
+      debts.forEach(function(d){if(d.remaining<=0)return;var interest=d.remaining*d.rate/1200,due=Math.min(d.payment,d.remaining+interest,available);d.remaining=Math.max(0,d.remaining-Math.max(0,due-interest));available-=due;});
+      debts.sort(function(a,b){return (b.remaining>0?b.rate:-1)-(a.remaining>0?a.rate:-1);});
+      while(available>.01){var target=debts.find(function(d){return d.remaining>.01;});if(!target)break;var extra=Math.min(available,target.remaining);target.remaining-=extra;available-=extra;}
+      values.push(debts.reduce(function(s,d){return s+d.remaining;},0));
+      if(monthlyBudget<=0)break;
+    }
+    return values;
+  }
+  function debtLineChartHtml(loans,extra,windfall){
+    var all=debtTimeline(loans,extra,windfall),step=Math.max(1,Math.ceil((all.length-1)/24)),values=all.filter(function(_,index){return index%step===0||index===all.length-1;}),width=320,height=145,pad=12,max=Math.max(1,values[0]),last=values.length-1;
+    var points=values.map(function(value,index){return {x:pad+(width-pad*2)*(last?index/last:0),y:pad+(height-pad*2)*(1-value/max)};});
+    var line=points.map(function(p){return p.x.toFixed(1)+','+p.y.toFixed(1);}).join(' '),area=pad+','+(height-pad)+' '+line+' '+(width-pad)+','+(height-pad);
+    return '<div class="debt-line-chart"><svg viewBox="0 0 '+width+' '+height+'" role="img" aria-label="กราฟยอดหนี้คงเหลือตามเดือน"><line class="chart-grid" x1="12" y1="12" x2="308" y2="12"/><line class="chart-grid" x1="12" y1="72" x2="308" y2="72"/><line class="chart-grid" x1="12" y1="133" x2="308" y2="133"/><polygon class="chart-area" points="'+area+'"/><polyline class="chart-line" points="'+line+'"/><circle class="chart-dot" cx="'+points[points.length-1].x+'" cy="'+points[points.length-1].y+'" r="4"/></svg><div class="chart-labels"><span>วันนี้ · '+fmtBaht(all[0])+'</span><span>'+(all.length-1)+' เดือน · '+fmtBaht(all[all.length-1])+'</span></div></div>';
   }
   function monthsUntil(dateValue){
     if(!dateValue)return null; var target=new Date(dateValue+'T00:00:00');
@@ -244,24 +265,53 @@
   /* ---------- TABS ---------- */
   function setTab(tab){
     activeTab = tab;
+    document.getElementById('tabDashboard').classList.toggle('active', tab==='dashboard');
     document.getElementById('tabBills').classList.toggle('active', tab==='bills');
     document.getElementById('tabLoans').classList.toggle('active', tab==='loans');
+    document.getElementById('tabCalendar').classList.toggle('active', tab==='calendar');
     document.getElementById('tabSummary').classList.toggle('active', tab==='summary');
     document.getElementById('billsHero').style.display = tab==='bills' ? 'flex' : 'none';
     document.getElementById('loansHero').style.display = tab==='loans' ? 'flex' : 'none';
-    document.getElementById('addBtn').style.display = tab==='summary' ? 'none' : '';
+    document.getElementById('monthNav').style.display = (tab==='bills'||tab==='loans'||tab==='calendar') ? 'flex' : 'none';
+    document.getElementById('addBtn').style.display = (tab==='bills'||tab==='loans') ? '' : 'none';
     render();
   }
+  document.getElementById('tabDashboard').addEventListener('click', function(){ setTab('dashboard'); });
   document.getElementById('tabBills').addEventListener('click', function(){ setTab('bills'); });
   document.getElementById('tabLoans').addEventListener('click', function(){ setTab('loans'); });
+  document.getElementById('tabCalendar').addEventListener('click', function(){ setTab('calendar'); });
   document.getElementById('tabSummary').addEventListener('click', function(){ setTab('summary'); });
 
   /* ---------- RENDER ---------- */
   function render(){
     document.getElementById('monthLabel').textContent = MONTH_NAMES[viewMonth] + ' ' + (viewYear+543);
-    if(activeTab==='bills') renderBills();
+    if(activeTab==='dashboard') renderDashboard();
+    else if(activeTab==='bills') renderBills();
     else if(activeTab==='loans') renderLoans();
+    else if(activeTab==='calendar') renderCalendar();
     else renderDebtSummary();
+  }
+
+  function renderDashboard(){
+    var listArea=document.getElementById('listArea'),now=new Date(),year=now.getFullYear(),month=now.getMonth(),todayMid=new Date(year,month,now.getDate()),items=[];
+    state.bills.forEach(function(bill){var pay=(state.payments[monthKey(year,month)]||{})[bill.id];if(pay&&pay.paid)return;var due=new Date(year,month,Math.min(bill.dueDay,daysInMonth(year,month)));items.push({type:'bill',name:bill.name,due:due,diff:Math.round((due-todayMid)/86400000),amount:bill.amount});});
+    state.loans.filter(function(loan){return isLoanActiveInMonth(loan,year,month);}).forEach(function(loan){var pay=(state.loanPayments[monthKey(year,month)]||{})[loan.id];if(pay&&pay.paid)return;var due=new Date(year,month,Math.min(loan.dueDay,daysInMonth(year,month)));items.push({type:'loan',name:loan.name,due:due,diff:Math.round((due-todayMid)/86400000),amount:loanPaymentForMonth(loan,year,month)});});
+    items.sort(function(a,b){return a.diff-b.diff;});
+    var urgent=items.filter(function(item){return item.diff<=7;}).slice(0,3),focus=state.loans.filter(function(l){return Number(l.remaining||0)>0;}).sort(function(a,b){return Number(b.interestRate||0)-Number(a.interestRate||0);})[0];
+    var alerts=urgent.length?urgent.map(function(item){var when=item.diff<0?'เลยกำหนด '+Math.abs(item.diff)+' วัน':item.diff===0?'ครบกำหนดวันนี้':'อีก '+item.diff+' วัน';return '<div class="today-alert"><div class="alert-icon">'+(item.type==='loan'?'🏦':'🧾')+'</div><div class="alert-main"><strong>'+escapeHtml(item.name)+'</strong><small>'+when+' · วันที่ '+item.due.getDate()+'</small></div><div class="alert-amount">'+fmtBaht(item.amount)+'</div></div>';}).join(''):'<div class="empty" style="padding:18px">ไม่มีรายการใกล้ครบกำหนดใน 7 วัน 🎉</div>';
+    var focusHtml=focus?'<div class="focus-debt"><div class="section-kicker">เป้าหมายโปะอันดับ 1</div><h3>'+escapeHtml(focus.name)+(focus.bank?' · '+escapeHtml(focus.bank):'')+'</h3><div class="rate">'+Number(focus.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'% <small style="font-size:11px">ต่อปี</small></div><div class="reason">คงเหลือ '+fmtBaht(focus.remaining)+' · ดอกประมาณ '+fmtBaht(Number(focus.remaining||0)*Number(focus.interestRate||0)/1200)+'/เดือน</div></div>':'<div class="empty" style="padding:18px">ไม่มีหนี้คงเหลือ 🎉</div>';
+    listArea.innerHTML='<div class="dashboard-welcome"><h2>วันนี้ต้องรู้อะไรบ้าง 👋</h2><p>'+now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</p></div><div class="debt-summary-card"><div class="section-title-row"><h3>ใกล้ครบกำหนด</h3><span class="recommended-pill">'+urgent.length+' รายการ</span></div>'+alerts+'</div><div class="debt-summary-card"><h3>ควรโปะก้อนไหนก่อน</h3>'+focusHtml+'</div>';
+  }
+
+  function renderCalendar(){
+    var listArea=document.getElementById('listArea'),firstDay=new Date(viewYear,viewMonth,1).getDay(),count=daysInMonth(viewYear,viewMonth),events={};
+    function addEvent(day,event){if(!events[day])events[day]=[];events[day].push(event);}
+    state.bills.forEach(function(b){addEvent(Math.min(b.dueDay,count),{name:b.name,type:'bill'});});
+    state.loans.filter(function(l){return isLoanActiveInMonth(l,viewYear,viewMonth);}).forEach(function(l){addEvent(Math.min(l.dueDay,count),{name:l.name,type:'loan'});});
+    var cells='';for(var blank=0;blank<firstDay;blank++)cells+='<div class="calendar-day muted"></div>';
+    for(var day=1;day<=count;day++){var isToday=isCurrentMonth()&&today.getDate()===day;cells+='<div class="calendar-day'+(isToday?' today':'')+'"><div class="calendar-number">'+day+'</div>'+((events[day]||[]).map(function(event){return '<div class="calendar-event '+event.type+'" title="'+escapeHtml(event.name)+'">'+escapeHtml(event.name)+'</div>';}).join(''))+'</div>';}
+    var labels=['อา','จ','อ','พ','พฤ','ศ','ส'].map(function(label){return '<div class="calendar-weekday">'+label+'</div>';}).join('');
+    listArea.innerHTML='<div class="debt-summary-card"><div class="section-title-row"><div><div class="section-kicker">CALENDAR</div><h3>วันครบกำหนดทั้งหมด</h3></div></div><div class="calendar-legend"><span><i class="legend-dot"></i>บิล</span><span><i class="legend-dot loan"></i>สินเชื่อ</span></div><div class="calendar-grid">'+labels+cells+'</div></div>';
   }
 
   function renderBills(){
@@ -533,6 +583,7 @@
         '<div class="debt-metric"><span class="lab">จำนวนหนี้</span><span class="val">'+loans.length+' รายการ</span></div>'+
         '<div class="debt-metric"><span class="lab">ค่าปิดก่อนกำหนดรวม</span><span class="val">'+fmtBaht(closingFees)+'</span></div>'+
       '</div></div>'+
+      '<div class="debt-summary-card"><div class="section-kicker">DECLINING BALANCE</div><h3>ยอดหนี้จะลดลงอย่างไร</h3><p class="reason">ประมาณการจากค่างวดปกติและดอกเบี้ยที่บันทึกไว้</p><div id="debtTimelineChart">'+debtLineChartHtml(loans,0,0)+'</div></div>'+
       '<div class="debt-summary-card"><div class="section-kicker">SIMULATOR</div><h3>ลองแผนปลดหนี้</h3><div class="planner-controls">'+
         '<div class="field"><label>เงินโปะเพิ่ม/เดือน</label><input type="number" id="simExtra" min="0" placeholder="เช่น 2000"></div>'+
         '<div class="field"><label>เงินก้อนพิเศษ</label><input type="number" id="simWindfall" min="0" placeholder="เช่น 10000"></div>'+
@@ -547,6 +598,7 @@
       var windfall=Number(document.getElementById('simWindfall').value)||0;
       var baseline=simulateDebtPayoff(loans,0,0);
       var plan=simulateDebtPayoff(loans,extra,windfall);
+      document.getElementById('debtTimelineChart').innerHTML=debtLineChartHtml(loans,extra,windfall);
       var targetMonths=monthsUntil(document.getElementById('simTarget').value);
       var targetText='';
       if(targetMonths){

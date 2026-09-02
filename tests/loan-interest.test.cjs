@@ -9,6 +9,7 @@ const activeMonthSource = source.match(/function isLoanActiveInMonth\(loan, year
 const paymentForMonthSource = source.match(/function loanPaymentForMonth\(loan, year, month\)\{[\s\S]*?\n  \}/)?.[0];
 const parseScheduleSource = source.match(/function parsePaymentSchedule\(text\)\{[\s\S]*?\n  \}/)?.[0];
 const simulationSource = source.match(/function simulateDebtPayoff\(sourceLoans,extraMonthly,windfall\)\{[\s\S]*?\n  \}/)?.[0];
+const timelineSource = source.match(/function debtTimeline\(sourceLoans,extraMonthly,windfall\)\{[\s\S]*?\n  \}/)?.[0];
 
 assert.ok(projectionSource, 'loanProjection must exist');
 assert.ok(breakdownSource, 'loanPaymentBreakdown must exist');
@@ -17,7 +18,8 @@ assert.ok(activeMonthSource, 'isLoanActiveInMonth must exist');
 assert.ok(paymentForMonthSource, 'loanPaymentForMonth must exist');
 assert.ok(parseScheduleSource, 'parsePaymentSchedule must exist');
 assert.ok(simulationSource, 'simulateDebtPayoff must exist');
-eval(`${projectionSource}\n${breakdownSource}\n${monthKeySource}\n${activeMonthSource}\n${paymentForMonthSource}\n${parseScheduleSource}\n${simulationSource}`);
+assert.ok(timelineSource, 'debtTimeline must exist');
+eval(`${projectionSource}\n${breakdownSource}\n${monthKeySource}\n${activeMonthSource}\n${paymentForMonthSource}\n${parseScheduleSource}\n${simulationSource}\n${timelineSource}`);
 
 const noInterest = loanProjection({remaining: 12000, monthlyPayment: 1000, interestRate: 0});
 assert.equal(noInterest.months, 12);
@@ -52,5 +54,9 @@ assert.equal(baselinePlan.complete,true);
 assert.equal(extraPlan.complete,true);
 assert.ok(extraPlan.months < baselinePlan.months);
 assert.ok(extraPlan.totalInterest < baselinePlan.totalInterest);
+const timeline = debtTimeline([{remaining:100000,monthlyPayment:5000,interestRate:12}],2000,10000);
+assert.equal(timeline[0],90000);
+assert.ok(timeline[timeline.length-1] < 0.01);
+assert.ok(timeline.every((value,index)=>index===0||value<=timeline[index-1]));
 
 console.log('loan interest calculations: passed');

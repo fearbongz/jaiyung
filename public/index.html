@@ -30,12 +30,14 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" id="tabBills">🧾 บิลรายเดือน</div>
+    <div class="tab active" id="tabDashboard">🏠 วันนี้</div>
+    <div class="tab" id="tabBills">🧾 บิล</div>
     <div class="tab" id="tabLoans">🏦 สินเชื่อ</div>
+    <div class="tab" id="tabCalendar">📅 ปฏิทิน</div>
     <div class="tab" id="tabSummary">📊 สรุปหนี้</div>
   </div>
 
-  <div class="monthnav">
+  <div class="monthnav" id="monthNav" style="display:none;">
     <button id="prevMonth">‹</button>
     <div class="mlabel" id="monthLabel"></div>
     <button id="nextMonth">›</button>
