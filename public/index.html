@@ -34,6 +34,7 @@
     <div class="tab" id="tabBills">🧾 บิล</div>
     <div class="tab" id="tabLoans">🏦 สินเชื่อ</div>
     <div class="tab" id="tabCalendar">📅 ปฏิทิน</div>
+    <div class="tab" id="tabSavings">💰 ออม</div>
     <div class="tab" id="tabSummary">📊 สรุปหนี้</div>
   </div>
 
@@ -87,6 +88,19 @@
 </div>
 
 <button class="fab" id="addBtn" aria-label="เพิ่ม">＋</button>
+
+<!-- Add/Edit SAVINGS GOAL sheet -->
+<div class="overlay" id="savingOverlay">
+  <div class="sheet">
+    <div class="sheet-head"><h2 id="savingSheetTitle">เพิ่มเป้าหมายการออม</h2><button class="close-x" id="closeSavingSheet">✕</button></div>
+    <div class="field"><label>ชื่อเป้าหมาย</label><input type="text" id="sName" placeholder="เช่น เงินฉุกเฉิน, เงินดาวน์บ้าน"></div>
+    <div class="field"><label>ยอดเป้าหมาย (บาท)</label><input type="number" id="sTarget" min="1" placeholder="100000"></div>
+    <div class="field"><label>ออมแล้ว (บาท)</label><input type="number" id="sCurrent" min="0" placeholder="0"></div>
+    <div class="field"><label>อยากเก็บครบภายใน — ไม่บังคับ</label><input type="month" id="sTargetDate"></div>
+    <div class="field"><label>โน้ต — ไม่บังคับ</label><input type="text" id="sNote" placeholder="เช่น เก็บไว้ในบัญชีดอกเบี้ยสูง"></div>
+    <div class="sheet-actions"><button class="btn danger" id="deleteSavingBtn" style="display:none">ลบเป้าหมาย</button><button class="btn primary" id="saveSavingBtn">บันทึก</button></div>
+  </div>
+</div>
 
 <!-- Add/Edit BILL sheet -->
 <div class="overlay" id="billOverlay">
@@ -273,6 +287,16 @@
       <h3>การแจ้งเตือน</h3>
       <div class="field"><label>เตือนก่อนครบกำหนดกี่วัน</label><input type="number" id="fReminderDays" min="0" max="30" value="3"></div>
       <button class="btn ghost" id="enableNotificationsBtn" style="width:100%;">เปิดการแจ้งเตือนบนอุปกรณ์นี้</button>
+    </div>
+    <div class="sec-block">
+      <h3>จัดสรรเงินเหลือรายเดือน</h3>
+      <p class="subnote">เปอร์เซ็นต์ทั้งสามช่องต้องรวมกันเท่ากับ 100%</p>
+      <div class="allocation-inputs">
+        <div class="field"><label>โปะหนี้ %</label><input type="number" id="fAllocDebt" min="0" max="100"></div>
+        <div class="field"><label>ออม %</label><input type="number" id="fAllocSavings" min="0" max="100"></div>
+        <div class="field"><label>ใช้จ่าย %</label><input type="number" id="fAllocSpending" min="0" max="100"></div>
+      </div>
+      <div class="lock-error" id="allocationError" style="text-align:left"></div>
     </div>
     <div class="sec-block">
       <h3>สำรองและนำข้อมูลออก</h3>

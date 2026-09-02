@@ -29,6 +29,8 @@
       ],
       payments: {},
       loanPayments: {},
+      savingsGoals: [],
+      allocation: {debt:50,savings:30,spending:20},
       budget: null
     };
   }
@@ -59,6 +61,8 @@
     if(!Array.isArray(loaded.loans)) loaded.loans = [];
     if(!loaded.payments) loaded.payments = {};
     if(!loaded.loanPayments) loaded.loanPayments = {};
+    if(!Array.isArray(loaded.savingsGoals)) loaded.savingsGoals = [];
+    if(!loaded.allocation) loaded.allocation = {debt:50,savings:30,spending:20};
     if(typeof loaded.budget === 'undefined') loaded.budget = null;
     return loaded;
   }
@@ -269,17 +273,19 @@
     document.getElementById('tabBills').classList.toggle('active', tab==='bills');
     document.getElementById('tabLoans').classList.toggle('active', tab==='loans');
     document.getElementById('tabCalendar').classList.toggle('active', tab==='calendar');
+    document.getElementById('tabSavings').classList.toggle('active', tab==='savings');
     document.getElementById('tabSummary').classList.toggle('active', tab==='summary');
     document.getElementById('billsHero').style.display = tab==='bills' ? 'flex' : 'none';
     document.getElementById('loansHero').style.display = tab==='loans' ? 'flex' : 'none';
     document.getElementById('monthNav').style.display = (tab==='bills'||tab==='loans'||tab==='calendar') ? 'flex' : 'none';
-    document.getElementById('addBtn').style.display = (tab==='bills'||tab==='loans') ? '' : 'none';
+    document.getElementById('addBtn').style.display = (tab==='bills'||tab==='loans'||tab==='savings') ? '' : 'none';
     render();
   }
   document.getElementById('tabDashboard').addEventListener('click', function(){ setTab('dashboard'); });
   document.getElementById('tabBills').addEventListener('click', function(){ setTab('bills'); });
   document.getElementById('tabLoans').addEventListener('click', function(){ setTab('loans'); });
   document.getElementById('tabCalendar').addEventListener('click', function(){ setTab('calendar'); });
+  document.getElementById('tabSavings').addEventListener('click', function(){ setTab('savings'); });
   document.getElementById('tabSummary').addEventListener('click', function(){ setTab('summary'); });
 
   /* ---------- RENDER ---------- */
@@ -289,6 +295,7 @@
     else if(activeTab==='bills') renderBills();
     else if(activeTab==='loans') renderLoans();
     else if(activeTab==='calendar') renderCalendar();
+    else if(activeTab==='savings') renderSavings();
     else renderDebtSummary();
   }
 
@@ -300,7 +307,17 @@
     var urgent=items.filter(function(item){return item.diff<=7;}).slice(0,3),focus=state.loans.filter(function(l){return Number(l.remaining||0)>0;}).sort(function(a,b){return Number(b.interestRate||0)-Number(a.interestRate||0);})[0];
     var alerts=urgent.length?urgent.map(function(item){var when=item.diff<0?'เลยกำหนด '+Math.abs(item.diff)+' วัน':item.diff===0?'ครบกำหนดวันนี้':'อีก '+item.diff+' วัน';return '<div class="today-alert"><div class="alert-icon">'+(item.type==='loan'?'🏦':'🧾')+'</div><div class="alert-main"><strong>'+escapeHtml(item.name)+'</strong><small>'+when+' · วันที่ '+item.due.getDate()+'</small></div><div class="alert-amount">'+fmtBaht(item.amount)+'</div></div>';}).join(''):'<div class="empty" style="padding:18px">ไม่มีรายการใกล้ครบกำหนดใน 7 วัน 🎉</div>';
     var focusHtml=focus?'<div class="focus-debt"><div class="section-kicker">เป้าหมายโปะอันดับ 1</div><h3>'+escapeHtml(focus.name)+(focus.bank?' · '+escapeHtml(focus.bank):'')+'</h3><div class="rate">'+Number(focus.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'% <small style="font-size:11px">ต่อปี</small></div><div class="reason">คงเหลือ '+fmtBaht(focus.remaining)+' · ดอกประมาณ '+fmtBaht(Number(focus.remaining||0)*Number(focus.interestRate||0)/1200)+'/เดือน</div></div>':'<div class="empty" style="padding:18px">ไม่มีหนี้คงเหลือ 🎉</div>';
-    listArea.innerHTML='<div class="dashboard-welcome"><h2>วันนี้ต้องรู้อะไรบ้าง 👋</h2><p>'+now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</p></div><div class="debt-summary-card"><div class="section-title-row"><h3>ใกล้ครบกำหนด</h3><span class="recommended-pill">'+urgent.length+' รายการ</span></div>'+alerts+'</div><div class="debt-summary-card"><h3>ควรโปะก้อนไหนก่อน</h3>'+focusHtml+'</div>';
+    var billsPlanned=state.bills.reduce(function(sum,b){return sum+Number(b.amount||0);},0),loansPlanned=state.loans.filter(function(l){return isLoanActiveInMonth(l,year,month);}).reduce(function(sum,l){return sum+loanPaymentForMonth(l,year,month);},0),left=state.budget===null?null:Math.max(0,Number(state.budget)-billsPlanned-loansPlanned),allocation=state.allocation||{debt:50,savings:30,spending:20};
+    var allocationHtml=left===null?'<div class="empty" style="padding:18px">ตั้งรายรับต่อเดือนใน ⚙️ เพื่อให้ระบบจัดสรรเงินอัตโนมัติ</div>':'<div class="allocation-wrap"><div class="allocation-donut" style="background:conic-gradient(var(--coral) 0 '+allocation.debt+'%,var(--mint) '+allocation.debt+'% '+(allocation.debt+allocation.savings)+'%,var(--mustard) '+(allocation.debt+allocation.savings)+'% 100%)"></div><div class="allocation-list"><div class="allocation-row"><span><i style="background:var(--coral)"></i>โปะหนี้ '+allocation.debt+'%</span><strong>'+fmtBaht(left*allocation.debt/100)+'</strong></div><div class="allocation-row"><span><i style="background:var(--mint)"></i>ออม '+allocation.savings+'%</span><strong>'+fmtBaht(left*allocation.savings/100)+'</strong></div><div class="allocation-row"><span><i style="background:var(--mustard)"></i>ใช้จ่าย '+allocation.spending+'%</span><strong>'+fmtBaht(left*allocation.spending/100)+'</strong></div><div class="reason">เงินเหลือหลังบิลและค่างวด '+fmtBaht(left)+'</div></div></div>';
+    listArea.innerHTML='<div class="dashboard-welcome"><h2>วันนี้ต้องรู้อะไรบ้าง 👋</h2><p>'+now.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+'</p></div><div class="debt-summary-card"><div class="section-title-row"><h3>ใกล้ครบกำหนด</h3><span class="recommended-pill">'+urgent.length+' รายการ</span></div>'+alerts+'</div><div class="debt-summary-card"><h3>จัดสรรเงินเดือนนี้</h3>'+allocationHtml+'</div><div class="debt-summary-card"><h3>ควรโปะก้อนไหนก่อน</h3>'+focusHtml+'</div>';
+  }
+
+  function renderSavings(){
+    var listArea=document.getElementById('listArea'),goals=state.savingsGoals||[];
+    if(!goals.length){listArea.innerHTML='<div class="dashboard-welcome"><h2>เป้าหมายการออม 💰</h2><p>สร้างเงินฉุกเฉิน เงินดาวน์ หรือเป้าหมายสำคัญ</p></div><div class="empty"><span class="em-emoji">🌱</span>ยังไม่มีเป้าหมาย กด + เพื่อเริ่มออม</div>';return;}
+    listArea.innerHTML='<div class="dashboard-welcome"><h2>เป้าหมายการออม 💰</h2><p>'+goals.length+' เป้าหมาย · ออมแล้ว '+fmtBaht(goals.reduce(function(s,g){return s+Number(g.current||0);},0))+'</p></div>'+goals.map(function(goal){var pct=Math.min(100,Math.round(Number(goal.current||0)/Math.max(1,Number(goal.target||0))*100)),remaining=Math.max(0,Number(goal.target||0)-Number(goal.current||0)),months=monthsUntil(goal.targetDate),perMonth=months?Math.ceil(remaining/months):null;return '<div class="saving-card" data-saving-id="'+goal.id+'"><div class="saving-head"><div class="saving-icon">🎯</div><div class="saving-main"><h3>'+escapeHtml(goal.name)+'</h3><div class="reason">'+fmtBaht(goal.current)+' จาก '+fmtBaht(goal.target)+' · '+pct+'%</div></div><strong>'+fmtBaht(remaining)+'</strong></div><div class="loan-progress"><div class="fill" style="width:'+pct+'%;background:var(--mint)"></div></div><div class="loan-progress-label">'+(perMonth?'ควรออม '+fmtBaht(perMonth)+'/เดือน เพื่อให้ทัน '+goal.targetDate:'เหลืออีก '+fmtBaht(remaining))+'</div><div class="saving-actions"><button class="saving-deposit" data-saving-deposit="'+goal.id+'">+ บันทึกเงินออม</button><button class="saving-edit" data-saving-edit="'+goal.id+'">แก้ไข</button></div></div>';}).join('');
+    listArea.querySelectorAll('[data-saving-deposit]').forEach(function(button){button.addEventListener('click',function(){var goal=state.savingsGoals.find(function(g){return g.id===button.dataset.savingDeposit;});var amount=Number(prompt('เดือนนี้ออมเพิ่มเท่าไร?',0));if(!goal||!amount||amount<0)return;goal.current=Math.min(Number(goal.target||0),Number(goal.current||0)+amount);goal.deposits=goal.deposits||[];goal.deposits.push({amount:amount,at:new Date().toISOString()});saveState();renderSavings();});});
+    listArea.querySelectorAll('[data-saving-edit]').forEach(function(button){button.addEventListener('click',function(){var goal=state.savingsGoals.find(function(g){return g.id===button.dataset.savingEdit;});if(goal)openEditSavingSheet(goal);});});
   }
 
   function renderCalendar(){
@@ -1003,9 +1020,18 @@
     render();
   });
 
+  /* ---------- savings goals ---------- */
+  var savingOverlay=document.getElementById('savingOverlay'),editingSavingId=null;
+  function openAddSavingSheet(){editingSavingId=null;document.getElementById('savingSheetTitle').textContent='เพิ่มเป้าหมายการออม';['sName','sTarget','sCurrent','sTargetDate','sNote'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('deleteSavingBtn').style.display='none';savingOverlay.classList.add('show');}
+  function openEditSavingSheet(goal){editingSavingId=goal.id;document.getElementById('savingSheetTitle').textContent='แก้ไขเป้าหมาย';document.getElementById('sName').value=goal.name;document.getElementById('sTarget').value=goal.target;document.getElementById('sCurrent').value=goal.current||0;document.getElementById('sTargetDate').value=goal.targetDate||'';document.getElementById('sNote').value=goal.note||'';document.getElementById('deleteSavingBtn').style.display='';savingOverlay.classList.add('show');}
+  document.getElementById('closeSavingSheet').addEventListener('click',function(){savingOverlay.classList.remove('show');});
+  savingOverlay.addEventListener('click',function(event){if(event.target===savingOverlay)savingOverlay.classList.remove('show');});
+  document.getElementById('saveSavingBtn').addEventListener('click',function(){var name=document.getElementById('sName').value.trim(),target=Number(document.getElementById('sTarget').value)||0,current=Math.max(0,Number(document.getElementById('sCurrent').value)||0);if(!name||target<=0){alert('ใส่ชื่อและยอดเป้าหมายก่อนนะ');return;}var values={name:name,target:target,current:Math.min(current,target),targetDate:document.getElementById('sTargetDate').value,note:document.getElementById('sNote').value.trim()};if(editingSavingId){var goal=state.savingsGoals.find(function(g){return g.id===editingSavingId;});if(goal)Object.assign(goal,values);}else state.savingsGoals.push(Object.assign({id:'s'+uid(),createdAt:new Date().toISOString(),deposits:[]},values));saveState();savingOverlay.classList.remove('show');render();});
+  document.getElementById('deleteSavingBtn').addEventListener('click',function(){if(!editingSavingId||!confirm('ลบเป้าหมายการออมนี้ใช่ไหม?'))return;state.savingsGoals=state.savingsGoals.filter(function(g){return g.id!==editingSavingId;});saveState();savingOverlay.classList.remove('show');render();});
+
   /* ---------- FAB routes to the right sheet ---------- */
   document.getElementById('addBtn').addEventListener('click', function(){
-    if(activeTab==='bills') openAddBillSheet(); else openAddLoanSheet();
+    if(activeTab==='bills') openAddBillSheet(); else if(activeTab==='loans') openAddLoanSheet(); else openAddSavingSheet();
   });
 
   /* ---------- settings ---------- */
@@ -1013,15 +1039,20 @@
   document.getElementById('settingsBtn').addEventListener('click', function(){
     document.getElementById('fBudget').value = state.budget || '';
     document.getElementById('fReminderDays').value = typeof state.reminderDays==='number' ? state.reminderDays : 3;
+    var allocation=state.allocation||{debt:50,savings:30,spending:20};
+    document.getElementById('fAllocDebt').value=allocation.debt;document.getElementById('fAllocSavings').value=allocation.savings;document.getElementById('fAllocSpending').value=allocation.spending;document.getElementById('allocationError').textContent='';
     renderSecuritySection();
     settingsOverlay.classList.add('show');
   });
   document.getElementById('closeSettingsSheet').addEventListener('click', function(){ settingsOverlay.classList.remove('show'); });
   settingsOverlay.addEventListener('click', function(e){ if(e.target===settingsOverlay) settingsOverlay.classList.remove('show'); });
   document.getElementById('saveBudgetBtn').addEventListener('click', function(){
+    var allocDebt=Math.max(0,Number(document.getElementById('fAllocDebt').value)||0),allocSavings=Math.max(0,Number(document.getElementById('fAllocSavings').value)||0),allocSpending=Math.max(0,Number(document.getElementById('fAllocSpending').value)||0);
+    if(allocDebt+allocSavings+allocSpending!==100){document.getElementById('allocationError').textContent='สัดส่วนรวมต้องเท่ากับ 100% (ตอนนี้ '+(allocDebt+allocSavings+allocSpending)+'%)';return;}
     var v = document.getElementById('fBudget').value;
     state.budget = v ? Number(v) : null;
     state.reminderDays = Math.min(30,Math.max(0,Number(document.getElementById('fReminderDays').value)||0));
+    state.allocation={debt:allocDebt,savings:allocSavings,spending:allocSpending};
     saveState();
     settingsOverlay.classList.remove('show');
     render();
@@ -1053,6 +1084,7 @@
     var rows=[['ประเภท','ชื่อ','ธนาคาร','ยอดคงเหลือ','ค่างวด','ดอกเบี้ยต่อปี','วันครบกำหนด']];
     state.loans.forEach(function(l){rows.push(['สินเชื่อ',l.name,l.bank||'',l.remaining,l.monthlyPayment,l.interestRate||0,l.dueDay]);});
     state.bills.forEach(function(b){rows.push(['บิล',b.name,'',b.amount,b.amount,0,b.dueDay]);});
+    (state.savingsGoals||[]).forEach(function(g){rows.push(['เป้าหมายออม',g.name,'',Math.max(0,g.target-g.current),g.current,0,g.targetDate||'']);});
     var csv='\uFEFF'+rows.map(function(row){return row.map(function(value){return '"'+String(value).replace(/"/g,'""')+'"';}).join(',');}).join('\r\n');downloadFile('jaiyung-'+new Date().toISOString().slice(0,10)+'.csv',csv,'text/csv;charset=utf-8');
   });
   document.getElementById('printReportBtn').addEventListener('click',function(){settingsOverlay.classList.remove('show');setTab('summary');setTimeout(function(){window.print();},100);});
@@ -1075,7 +1107,7 @@
       state = await loadState();
       document.body.classList.remove('app-locked');
       lockOverlay.classList.remove('show');
-      render();
+      setTab(activeTab);
       checkDueNotifications();
     }catch(error){
       currentAccount = null;
