@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>จ่ายยัง</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chonburi&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <span class="lock-emoji">🔒</span>
+    <div id="lockContent"></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <h1 class="display">จ่ายยัง 🧾</h1>
+      <p>เช็กบิล เตือนจ่าย เหลือเท่าไหร่ก็รู้ทันที</p>
+    </div>
+    <button class="gear-btn" id="settingsBtn" aria-label="ตั้งค่า">⚙️</button>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" id="tabBills">🧾 บิลรายเดือน</div>
+    <div class="tab" id="tabLoans">🏦 สินเชื่อ</div>
+  </div>
+
+  <div class="monthnav">
+    <button id="prevMonth">‹</button>
+    <div class="mlabel" id="monthLabel"></div>
+    <button id="nextMonth">›</button>
+  </div>
+
+  <!-- Bills hero -->
+  <div class="hero" id="billsHero">
+    <div class="ring-wrap">
+      <svg width="104" height="104" viewBox="0 0 104 104">
+        <circle cx="52" cy="52" r="44" fill="none" stroke="var(--card-2)" stroke-width="12"/>
+        <circle id="ringProgress" cx="52" cy="52" r="44" fill="none" stroke="var(--mint)" stroke-width="12" stroke-linecap="round"/>
+      </svg>
+      <div class="ring-center">
+        <div class="pct" id="pctText">0%</div>
+        <div class="pct-label">จ่ายแล้ว</div>
+      </div>
+    </div>
+    <div class="hero-info">
+      <div class="hero-row paid"><span class="lab">จ่ายไปแล้ว</span><span class="val" id="paidVal">฿0</span></div>
+      <div class="hero-row remain"><span class="lab">คงเหลือต้องจ่าย</span><span class="val" id="remainVal">฿0</span></div>
+      <div class="hero-div" id="budgetDiv" style="display:none;"></div>
+      <div class="hero-row left" id="budgetRow" style="display:none;"><span class="lab">เหลือใช้เดือนนี้</span><span class="val" id="leftVal">฿0</span></div>
+    </div>
+  </div>
+
+  <!-- Loans hero -->
+  <div class="hero" id="loansHero" style="display:none;">
+    <div class="ring-wrap">
+      <svg width="104" height="104" viewBox="0 0 104 104">
+        <circle cx="52" cy="52" r="44" fill="none" stroke="var(--card-2)" stroke-width="12"/>
+        <circle id="loanRingProgress" cx="52" cy="52" r="44" fill="none" stroke="var(--plum)" stroke-width="12" stroke-linecap="round"/>
+      </svg>
+      <div class="ring-center">
+        <div class="pct" id="loanPctText">0%</div>
+        <div class="pct-label">งวดเดือนนี้<br>จ่ายแล้ว</div>
+      </div>
+    </div>
+    <div class="hero-info">
+      <div class="hero-row debt"><span class="lab">หนี้คงเหลือรวม</span><span class="val" id="debtVal">฿0</span></div>
+      <div class="hero-row remain"><span class="lab">งวดที่ต้องจ่ายเดือนนี้</span><span class="val" id="loanRemainVal">฿0</span></div>
+      <div class="hero-row paid"><span class="lab">จ่ายงวดแล้วเดือนนี้</span><span class="val" id="loanPaidVal">฿0</span></div>
+    </div>
+  </div>
+
+  <div id="listArea"></div>
+
+</div>
+
+<button class="fab" id="addBtn" aria-label="เพิ่ม">＋</button>
+
+<!-- Add/Edit BILL sheet -->
+<div class="overlay" id="billOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="sheetTitle">เพิ่มบิลใหม่</h2>
+      <button class="close-x" id="closeBillSheet">✕</button>
+    </div>
+    <div class="field">
+      <label>หมวดหมู่</label>
+      <div class="chips" id="catChips"></div>
+    </div>
+    <div class="field">
+      <label>ไอคอน</label>
+      <div class="chips" id="iconChips"></div>
+      <input type="text" id="fIcon" maxlength="4" placeholder="พิมพ์/วางอิโมจิเอง เช่น 🐶" style="margin-top:8px; text-align:center; font-size:20px;">
+      <div class="subnote">แตะไอคอนด้านบนเพื่อเลือกเร็วๆ หรือพิมพ์เองก็ได้ — ถ้าเลือกหมวด "อื่นๆ" ต้องเลือกหรือพิมพ์ไอคอนเอง</div>
+    </div>
+    <div class="field">
+      <label>ชื่อบิล</label>
+      <input type="text" id="fName" placeholder="เช่น ค่าไฟบ้าน">
+    </div>
+    <div class="field">
+      <label>ยอดประมาณ (บาท)</label>
+      <input type="number" id="fAmount" placeholder="0" min="0" step="1">
+    </div>
+    <div class="field">
+      <label>ครบกำหนดวันที่ (1–31 ของเดือน)</label>
+      <input type="number" id="fDueDay" placeholder="5" min="1" max="31">
+    </div>
+    <div class="field">
+      <label>โน้ตเพิ่มเติม (ถ้ามี)</label>
+      <input type="text" id="fNote" placeholder="เช่น เลขที่บัญชี, จำนวนงวด">
+    </div>
+    <div class="toggle-row">
+      <span style="font-size:14px;">จ่ายประจำทุกเดือน</span>
+      <div class="switch on" id="recurringSwitch"><div class="knob"></div></div>
+    </div>
+    <div class="sheet-actions">
+      <button class="btn danger" id="deleteBillBtn" style="display:none;">ลบบิลนี้</button>
+      <button class="btn primary" id="saveBillBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit LOAN sheet -->
+<div class="overlay" id="loanOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="loanSheetTitle">เพิ่มสินเชื่อใหม่</h2>
+      <button class="close-x" id="closeLoanSheet">✕</button>
+    </div>
+    <div class="field">
+      <label>ชื่อสินเชื่อ</label>
+      <input type="text" id="lName" placeholder="เช่น ผ่อนรถ, กยศ., บ้าน, บัตรเครดิต A">
+    </div>
+    <div class="field">
+      <label>ยอดกู้ทั้งหมด (บาท) — ไม่บังคับ</label>
+      <input type="number" id="lTotal" placeholder="เช่น 500000" min="0" step="1">
+      <div class="subnote">ใส่ไว้เพื่อดูเปอร์เซ็นต์ผ่อนไปแล้วทั้งก้อน ไม่ใส่ก็ได้</div>
+    </div>
+    <div class="field">
+      <label>ยอดคงเหลือตอนนี้ (บาท)</label>
+      <input type="number" id="lRemaining" placeholder="0" min="0" step="1">
+    </div>
+    <div class="field">
+      <label>ค่างวดต่อเดือน (บาท)</label>
+      <input type="number" id="lMonthly" placeholder="0" min="0" step="1">
+    </div>
+    <div class="field">
+      <label>ครบกำหนดชำระวันที่ (1–31 ของเดือน)</label>
+      <input type="number" id="lDueDay" placeholder="15" min="1" max="31">
+    </div>
+    <div class="field">
+      <label>โน้ตเพิ่มเติม (ถ้ามี)</label>
+      <input type="text" id="lNote" placeholder="เช่น ธนาคาร, เลขที่สัญญา, ดอกเบี้ย">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn danger" id="deleteLoanBtn" style="display:none;">ลบสินเชื่อนี้</button>
+      <button class="btn primary loanbtn" id="saveLoanBtn">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Loan DETAIL (summary) sheet -->
+<div class="overlay" id="loanDetailOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2 id="detailName">สินเชื่อ</h2>
+      <button class="close-x" id="closeLoanDetail">✕</button>
+    </div>
+    <div class="detail-badge" id="detailBadge"></div>
+    <div class="detail-hero">
+      <div class="ring-wrap">
+        <svg width="104" height="104" viewBox="0 0 104 104">
+          <circle cx="52" cy="52" r="44" fill="none" stroke="var(--card-2)" stroke-width="12"/>
+          <circle id="detailRing" cx="52" cy="52" r="44" fill="none" stroke="var(--plum)" stroke-width="12" stroke-linecap="round"/>
+        </svg>
+        <div class="ring-center">
+          <div class="pct money" id="detailRemainBig">฿0</div>
+          <div class="pct-label" id="detailRingLabel">คงเหลือ</div>
+        </div>
+      </div>
+      <div class="hero-info">
+        <div class="hero-row"><span class="lab">เหลืออีกประมาณ</span><span class="val" id="detailMonthsLeft">-</span></div>
+        <div class="hero-row"><span class="lab">คาดว่าจ่ายครบ</span><span class="val" id="detailPayoff">-</span></div>
+      </div>
+    </div>
+    <div class="detail-list">
+      <div class="detail-row"><span class="lab">ยอดกู้ทั้งหมด</span><span class="val" id="detailTotal">-</span></div>
+      <div class="detail-row"><span class="lab">ผ่อนไปแล้ว</span><span class="val" id="detailPaidOffPct">-</span></div>
+      <div class="detail-row"><span class="lab">ค่างวดต่อเดือน</span><span class="val" id="detailMonthly">-</span></div>
+      <div class="detail-row"><span class="lab">ครบกำหนดชำระ</span><span class="val" id="detailDue">-</span></div>
+      <div class="detail-row" id="detailNoteRow" style="display:none;"><span class="lab">โน้ต</span><span class="val" id="detailNote">-</span></div>
+    </div>
+    <div id="detailConfirmArea"></div>
+    <div class="sheet-actions">
+      <button class="btn ghost" id="detailPayBtn">จ่ายงวดยัง?</button>
+      <button class="btn primary loanbtn" id="detailEditBtn">แก้ไขข้อมูล</button>
+    </div>
+  </div>
+</div>
+
+<!-- Settings sheet -->
+<div class="overlay" id="settingsOverlay">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>ตั้งค่า</h2>
+      <button class="close-x" id="closeSettingsSheet">✕</button>
+    </div>
+    <div class="field">
+      <label>รายรับต่อเดือน (ไม่บังคับ — ใส่ไว้ดูว่าเหลือใช้เท่าไหร่หลังจ่ายบิลและงวดสินเชื่อ)</label>
+      <input type="number" id="fBudget" placeholder="เช่น 25000" min="0" step="1">
+    </div>
+    <div class="sheet-actions">
+      <button class="btn primary" id="saveBudgetBtn">บันทึก</button>
+    </div>
+    <div class="sec-block" id="securitySection"></div>
+    <p style="font-size:12px; color:var(--ink-soft); margin-top:18px; line-height:1.6;">
+      ข้อมูลถูกบันทึกในฐานข้อมูล PostgreSQL ของ Supabase และแยกตามบัญชีด้วย Row Level Security 🔒 ระบบบัญชีและรหัสผ่านดูแลโดย Supabase Auth
+    </p>
+  </div>
+</div>
+
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabase-config.js"></script>
+  <script src="assets/js/app.js" defer></script>
+</body>
+</html>
