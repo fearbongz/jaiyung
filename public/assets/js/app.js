@@ -350,11 +350,12 @@
     var rows = loans.map(function(l){
       var row = computeRow(l, l.dueDay, getPayment(state.loanPayments, l.id));
       row.monthlyPayment = loanPaymentForMonth(l,viewYear,viewMonth);
+      row.loanOrder = state.loans.indexOf(l);
       return row;
     });
 
-    var unpaidRows = rows.filter(function(r){return !r.paid;}).sort(function(a,b){return a.due-b.due;});
-    var paidRows = rows.filter(function(r){return r.paid;}).sort(function(a,b){return a.due-b.due;});
+    var unpaidRows = rows.filter(function(r){return !r.paid;}).sort(function(a,b){return a.loanOrder-b.loanOrder;});
+    var paidRows = rows.filter(function(r){return r.paid;}).sort(function(a,b){return a.loanOrder-b.loanOrder;});
 
     var totalDebt = loans.reduce(function(s,l){return s+Number(l.remaining||0);},0);
     var paidThisMonth = paidRows.reduce(function(s,r){return s + Number((r.pay && r.pay.amount) || r.monthlyPayment || 0);},0);
@@ -445,10 +446,7 @@
       list.forEach(function(r){ listArea.appendChild(makeLoanEl(r)); });
     }
 
-    var sortedUnpaid = unpaidRows.filter(function(r){return r.status==='overdue';}).concat(
-                        unpaidRows.filter(function(r){return r.status!=='overdue';}));
-    makeSection('ยังไม่จ่ายงวดนี้', sortedUnpaid);
-    makeSection('จ่ายงวดแล้ว', paidRows);
+    makeSection('สินเชื่อเก่าสุด → ใหม่สุด', rows.slice().sort(function(a,b){return a.loanOrder-b.loanOrder;}));
   }
 
   function renderDebtSummary(){
@@ -835,7 +833,7 @@
       var addedMonth = monthKey(today.getFullYear(),today.getMonth());
       var overrides={};
       if(monthOverride>0) overrides[monthKey(viewYear,viewMonth)]=monthOverride;
-      state.loans.push({id:uid(), name:name, bank:bank, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, paymentOverrides:overrides, interestRate:interestRate, addedMonth:addedMonth, startMonth:enteredStartMonth || addedMonth, dueDay:dueDay, note:note});
+      state.loans.push({id:uid(), name:name, bank:bank, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, paymentOverrides:overrides, interestRate:interestRate, addedMonth:addedMonth, createdAt:new Date().toISOString(), startMonth:enteredStartMonth || addedMonth, dueDay:dueDay, note:note});
     }
     saveState();
     loanOverlay.classList.remove('show');
