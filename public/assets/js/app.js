@@ -1177,6 +1177,17 @@
   var lockOverlay = document.getElementById('lockOverlay');
   var lockContent = document.getElementById('lockContent');
   var currentAccount = null;
+  var PIN_STORAGE_KEY = 'jaiyung_pin_v1';
+
+  function getPinConfig(){try{return JSON.parse(localStorage.getItem(PIN_STORAGE_KEY)||'null');}catch(error){return null;}}
+  function bytesToBase64(bytes){return btoa(String.fromCharCode.apply(null,new Uint8Array(bytes)));}
+  async function derivePin(pin,saltBase64){
+    var salt=Uint8Array.from(atob(saltBase64),function(char){return char.charCodeAt(0);});
+    var key=await crypto.subtle.importKey('raw',new TextEncoder().encode(pin),'PBKDF2',false,['deriveBits']);
+    return bytesToBase64(await crypto.subtle.deriveBits({name:'PBKDF2',salt:salt,iterations:150000,hash:'SHA-256'},key,256));
+  }
+  async function savePin(pin){var salt=crypto.getRandomValues(new Uint8Array(16)),salt64=bytesToBase64(salt),hash=await derivePin(pin,salt64);localStorage.setItem(PIN_STORAGE_KEY,JSON.stringify({userId:currentAccount.userId,salt:salt64,hash:hash}));}
+  function hasPin(){var config=getPinConfig();return !!(config&&currentAccount&&config.userId===currentAccount.userId);}
 
   function getAccount(){ return currentAccount; }
   function setLockError(message){
@@ -1198,12 +1209,21 @@
     }
   }
 
-  async function lockNow(){
-    try{ await getSupabaseClient().auth.signOut(); }catch(error){}
-    currentAccount = null;
+  async function signOutNow(){
+    try{await getSupabaseClient().auth.signOut();}catch(error){}
+    currentAccount=null;
     document.body.classList.add('app-locked');
     lockOverlay.classList.add('show');
     showLoginScreen();
+  }
+
+  function showPinScreen(){
+    document.body.classList.add('app-locked');lockOverlay.classList.add('show');
+    lockContent.innerHTML='<h2>ใส่ Passcode</h2><p>ใช้รหัส 6 หลักเพื่อเข้าแอปบนอุปกรณ์นี้</p><div class="lock-error" id="lockErr"></div><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="pinUnlock" placeholder="••••••" autocomplete="off"><button class="btn primary" id="pinUnlockBtn" style="width:100%">เข้าใช้งาน</button><div style="margin-top:10px"><button class="lock-link" id="pinUseAccount">ใช้อีเมลและรหัสผ่านแทน</button></div>';
+    var input=document.getElementById('pinUnlock');
+    async function unlock(){var config=getPinConfig(),pin=input.value;if(!/^\d{6}$/.test(pin)){setLockError('กรุณาใส่ตัวเลข 6 หลัก');return;}var hash=await derivePin(pin,config.salt);if(hash!==config.hash){setLockError('Passcode ไม่ถูกต้อง');input.value='';input.focus();return;}await showApp();}
+    document.getElementById('pinUnlockBtn').addEventListener('click',unlock);input.addEventListener('keydown',function(event){if(event.key==='Enter')unlock();});
+    document.getElementById('pinUseAccount').addEventListener('click',signOutNow);setTimeout(function(){input.focus();},50);
   }
 
   function showSignupScreen(){
@@ -1234,7 +1254,7 @@
           setLockError('สมัครเรียบร้อย กรุณายืนยันอีเมลแล้วกลับมาเข้าสู่ระบบ');
           return;
         }
-        currentAccount = {username:result.data.user.email};
+        currentAccount = {username:result.data.user.email,userId:result.data.user.id};
         await showApp();
       }catch(error){ setLockError(error.message); }
     });
@@ -1261,7 +1281,7 @@
           password:passwordInput.value
         });
         if(result.error) throw result.error;
-        currentAccount = {username:result.data.user.email};
+        currentAccount = {username:result.data.user.email,userId:result.data.user.id};
         await showApp();
       }catch(error){
         setLockError(error.message);
@@ -1280,8 +1300,8 @@
     try{
       var result = await getSupabaseClient().auth.getSession();
       if(result.error) throw result.error;
-      currentAccount = result.data.session ? {username:result.data.session.user.email} : null;
-      if(currentAccount) await showApp(); else showLoginScreen();
+      currentAccount = result.data.session ? {username:result.data.session.user.email,userId:result.data.session.user.id} : null;
+      if(currentAccount){if(hasPin())showPinScreen();else await showApp();}else showLoginScreen();
     }catch(error){
       showLoginScreen();
       setLockError('เชื่อมต่อระบบหลังบ้านไม่ได้: ' + error.message);
@@ -1292,14 +1312,32 @@
     var box = document.getElementById('securitySection');
     box.innerHTML =
       '<h3>ความปลอดภัย 🔒 เข้าสู่ระบบเป็น @'+escapeHtml(currentAccount ? currentAccount.username : '')+'</h3>'+
-      '<button class="btn ghost" id="logoutBtn" style="width:100%">ออกจากระบบ</button>'+
+      '<button class="btn ghost" id="pinBtn" style="width:100%">'+(hasPin()?'เปลี่ยน / ปิด Passcode 6 หลัก':'ตั้งค่า Passcode 6 หลัก')+'</button>'+
+      (hasPin()?'<button class="btn ghost" id="lockNowBtn" style="width:100%">ล็อกแอปตอนนี้</button>':'')+
+      '<button class="btn ghost" id="logoutBtn" style="width:100%">ออกจากระบบด้วยอีเมล</button>'+
       '<button class="btn ghost" id="changePassBtn" style="width:100%">เปลี่ยนรหัสผ่าน</button>'+
       '<button class="btn danger" id="deleteAccBtn" style="width:100%">ลบข้อมูลการเงินทั้งหมด</button>'+
       '<div id="secForm"></div>';
-    document.getElementById('logoutBtn').addEventListener('click', function(){ settingsOverlay.classList.remove('show'); lockNow(); });
+    document.getElementById('logoutBtn').addEventListener('click', function(){settingsOverlay.classList.remove('show');signOutNow();});
+    document.getElementById('pinBtn').addEventListener('click',showPinSettings);
+    if(hasPin())document.getElementById('lockNowBtn').addEventListener('click',function(){settingsOverlay.classList.remove('show');showPinScreen();});
     document.getElementById('changePassBtn').addEventListener('click', function(){ showSecForm('change'); });
     document.getElementById('deleteAccBtn').addEventListener('click', function(){ showSecForm('delete'); });
   }
+
+  function showPinSettings(){
+    var form=document.getElementById('secForm'),enabled=hasPin();
+    form.innerHTML='<div class="lock-error" id="secErr" style="text-align:left"></div><div class="field"><label>'+(enabled?'Passcode ใหม่':'ตั้ง Passcode')+' (ตัวเลข 6 หลัก)</label><input type="password" inputmode="numeric" maxlength="6" id="secPin" autocomplete="new-password"></div><div class="field"><label>ยืนยัน Passcode</label><input type="password" inputmode="numeric" maxlength="6" id="secPin2" autocomplete="new-password"></div><button class="btn primary" id="savePinBtn" style="width:100%">'+(enabled?'เปลี่ยน Passcode':'เปิดใช้ Passcode')+'</button>'+(enabled?'<button class="btn danger" id="disablePinBtn" style="width:100%;margin-top:8px">ปิดการใช้ Passcode</button>':'')+'<p class="subnote">Passcode ใช้ได้เฉพาะอุปกรณ์นี้ หากออกจากระบบหรือล้างข้อมูลเบราว์เซอร์ ต้องเข้าสู่ระบบด้วยอีเมลอีกครั้ง</p>';
+    document.getElementById('savePinBtn').addEventListener('click',async function(){var pin=document.getElementById('secPin').value,confirmPin=document.getElementById('secPin2').value,error=document.getElementById('secErr');if(!/^\d{6}$/.test(pin)){error.textContent='Passcode ต้องเป็นตัวเลข 6 หลัก';return;}if(pin!==confirmPin){error.textContent='Passcode ทั้งสองช่องไม่ตรงกัน';return;}try{await savePin(pin);renderSecuritySection();}catch(err){error.textContent='ตั้ง Passcode ไม่สำเร็จ: '+err.message;}});
+    if(enabled)document.getElementById('disablePinBtn').addEventListener('click',function(){if(confirm('ปิดการใช้ Passcode บนอุปกรณ์นี้ใช่ไหม?')){localStorage.removeItem(PIN_STORAGE_KEY);renderSecuritySection();}});
+  }
+
+  var appHiddenAt=0;
+  document.addEventListener('visibilitychange',function(){
+    if(document.hidden){appHiddenAt=Date.now();return;}
+    if(appHiddenAt&&Date.now()-appHiddenAt>60000&&hasPin()&&!document.body.classList.contains('app-locked'))showPinScreen();
+    appHiddenAt=0;
+  });
 
   function showSecForm(mode){
     var form = document.getElementById('secForm');
