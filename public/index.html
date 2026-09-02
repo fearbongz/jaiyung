@@ -158,6 +158,11 @@
       <div class="subnote">คำนวณแบบลดต้นลดดอก หากไม่มีดอกเบี้ยให้ใส่ 0</div>
     </div>
     <div class="field">
+      <label>เดือนเริ่มชำระ — ไม่บังคับ</label>
+      <input type="month" id="lStartMonth">
+      <div class="subnote">สินเชื่อจะแสดงตั้งแต่เดือนนี้เป็นต้นไป หากไม่ใส่จะใช้เดือนที่เพิ่มรายการ</div>
+    </div>
+    <div class="field">
       <label>ครบกำหนดชำระวันที่ (1–31 ของเดือน)</label>
       <input type="number" id="lDueDay" placeholder="15" min="1" max="31">
     </div>
@@ -201,6 +206,7 @@
       <div class="detail-row"><span class="lab">ผ่อนไปแล้ว</span><span class="val" id="detailPaidOffPct">-</span></div>
       <div class="detail-row"><span class="lab">ค่างวดต่อเดือน</span><span class="val" id="detailMonthly">-</span></div>
       <div class="detail-row"><span class="lab">อัตราดอกเบี้ย</span><span class="val" id="detailInterestRate">-</span></div>
+      <div class="detail-row"><span class="lab">เริ่มชำระ</span><span class="val" id="detailStartMonth">-</span></div>
       <div class="detail-row"><span class="lab">ดอกเบี้ยงวดถัดไป</span><span class="val" id="detailNextInterest">-</span></div>
       <div class="detail-row"><span class="lab">ดอกเบี้ยคงเหลือโดยประมาณ</span><span class="val" id="detailEstimatedInterest">-</span></div>
       <div class="detail-row"><span class="lab">ครบกำหนดชำระ</span><span class="val" id="detailDue">-</span></div>
