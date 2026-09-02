@@ -626,7 +626,7 @@
       if(/ประกัน/.test(name))return 'ins';
       return bill.category||'other';
     }
-    state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id],amount=Number(pay&&pay.paid?pay.amount:bill.amount)||0,category=reportCategory(bill);groups[category]=(groups[category]||0)+amount;total+=amount;});
+    state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id];if(!pay||!pay.paid)return;var amount=Number(pay.amount||0),category=reportCategory(bill);groups[category]=(groups[category]||0)+amount;total+=amount;});
     var entries=Object.keys(groups).sort(function(a,b){return groups[b]-groups[a];}),cursor=0,stops=[];
     entries.forEach(function(id,index){var end=cursor+(total?groups[id]/total*100:0);stops.push(colors[index%colors.length]+' '+cursor+'% '+end+'%');cursor=end;});
     var legend=entries.map(function(id,index){return '<div class="donut-row"><span><i style="background:'+colors[index%colors.length]+'"></i>'+escapeHtml(catInfo(id).name)+'</span><strong>'+fmtBaht(groups[id])+'</strong></div>';}).join('');
