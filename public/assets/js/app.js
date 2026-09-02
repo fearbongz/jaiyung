@@ -465,28 +465,36 @@
     var snowball = loans.slice().sort(function(a,b){return Number(a.remaining||0)-Number(b.remaining||0);});
     var expensive = avalanche[0];
     var smallest = snowball[0];
+    var maxDebt = Math.max.apply(null,loans.map(function(loan){return Number(loan.remaining||0);}));
 
     function priorityRows(items){
       return items.map(function(loan,index){
         var interest = Number(loan.remaining||0)*Number(loan.interestRate||0)/1200;
-        return '<div class="priority-item"><div><span class="rank">#'+(index+1)+'</span><strong>'+escapeHtml(loan.name)+'</strong>'+
-          (loan.bank?' <span class="reason">· '+escapeHtml(loan.bank)+'</span>':'')+
-          '<div class="reason">ดอกเบี้ย '+Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'%/ปี · เสียดอกประมาณ '+fmtBaht(interest)+'/เดือน</div></div>'+
-          '<div style="text-align:right"><strong>'+fmtBaht(loan.remaining)+'</strong><div class="reason">คงเหลือ</div></div></div>';
+        return '<div class="priority-item"><div class="priority-rank">'+(index+1)+'</div><div class="priority-main"><strong>'+escapeHtml(loan.name)+'</strong>'+
+          (loan.bank?' <span class="bank-pill">'+escapeHtml(loan.bank)+'</span>':'')+
+          '<div class="reason">ดอก '+Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'%/ปี · '+fmtBaht(interest)+'/เดือน</div></div>'+
+          '<div class="priority-money"><strong>'+fmtBaht(loan.remaining)+'</strong><span>คงเหลือ</span></div></div>';
       }).join('');
     }
 
+    var debtBars = loans.slice().sort(function(a,b){return Number(b.remaining||0)-Number(a.remaining||0);}).map(function(loan,index){
+      var width = maxDebt ? Math.max(5,Math.round(Number(loan.remaining||0)/maxDebt*100)) : 0;
+      return '<div class="debt-bar-row"><div class="debt-bar-head"><span>'+escapeHtml(loan.name)+'</span><strong>'+fmtBaht(loan.remaining)+'</strong></div><div class="debt-bar-track"><div class="debt-bar-fill color-'+(index%5)+'" style="width:'+width+'%"></div></div><div class="debt-bar-meta">'+Math.round(Number(loan.remaining||0)/totalDebt*100)+'% ของหนี้ทั้งหมด · ดอก '+Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'%</div></div>';
+    }).join('');
+
     listArea.innerHTML =
-      '<div class="debt-summary-card"><h2>ภาพรวมหนี้ทั้งหมด</h2><div class="debt-summary-grid">'+
+      '<div class="summary-hero"><div class="summary-eyebrow">ภาพรวมหนี้ของคุณ</div><div class="summary-total">'+fmtBaht(totalDebt)+'</div><div class="summary-caption">ยอดหนี้คงเหลือทั้งหมด</div><div class="summary-chips"><span>จ่ายเดือนนี้ <strong>'+fmtBaht(totalPayment)+'</strong></span><span>ดอก/เดือน <strong>'+fmtBaht(monthlyInterest)+'</strong></span></div></div>'+
+      '<div class="debt-summary-card"><div class="section-kicker">DEBT MAP</div><h3>หนี้อยู่ตรงไหนบ้าง</h3><div class="debt-bars">'+debtBars+'</div></div>'+
+      '<div class="debt-summary-card"><div class="section-kicker">PAYOFF PLAN</div><h3>เส้นทางเคลียร์หนี้</h3><div class="payoff-flow"><div><b>1</b><span>จ่ายขั้นต่ำ<br>ทุกก้อน</span></div><i>→</i><div class="focus"><b>2</b><span>โปะ <strong>'+escapeHtml(expensive.name)+'</strong><br>ดอกสูงสุด</span></div><i>→</i><div><b>3</b><span>ปิดแล้วทบ<br>ไปก้อนถัดไป</span></div></div></div>'+
+      '<div class="debt-summary-card"><h3>ตัวเลขสำคัญ</h3><div class="debt-summary-grid">'+
         '<div class="debt-metric"><span class="lab">หนี้คงเหลือรวม</span><span class="val">'+fmtBaht(totalDebt)+'</span></div>'+
         '<div class="debt-metric"><span class="lab">ต้องจ่ายเดือนนี้</span><span class="val">'+fmtBaht(totalPayment)+'</span></div>'+
         '<div class="debt-metric"><span class="lab">ดอกเบี้ยประมาณ/เดือน</span><span class="val">'+fmtBaht(monthlyInterest)+'</span></div>'+
         '<div class="debt-metric"><span class="lab">จำนวนหนี้</span><span class="val">'+loans.length+' รายการ</span></div>'+
       '</div></div>'+
-      '<div class="debt-summary-card"><h3>🎯 แนะนำให้โปะก่อน</h3><p class="reason">แบบ Avalanche: จ่ายขั้นต่ำทุกก้อน แล้วนำเงินที่เหลือไปโปะดอกเบี้ยสูงสุด เพื่อลดดอกเบี้ยรวม</p>'+
+      '<div class="debt-summary-card"><div class="section-title-row"><div><div class="section-kicker">AVALANCHE</div><h3>ลำดับที่ควรโปะ</h3></div><span class="recommended-pill">ประหยัดดอกสุด</span></div><p class="reason">จ่ายขั้นต่ำทุกก้อน แล้วนำเงินที่เหลือไปโปะตามลำดับนี้</p>'+
         '<div class="priority-list">'+priorityRows(avalanche)+'</div><p class="reason">ตัวเลขเป็นประมาณการแบบลดต้นลดดอก ควรตรวจค่าปรับปิดก่อนกำหนดและเงื่อนไขจริงกับธนาคารก่อนโปะ</p></div>'+
-      '<div class="debt-summary-card"><h3>คำตอบแบบเร็ว</h3><div class="priority-item"><div><strong>แพงสุด: '+escapeHtml(expensive.name)+'</strong><div class="reason">ดอกเบี้ยสูงสุด '+Number(expensive.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'% ต่อปี</div></div></div>'+
-        '<div class="priority-item"><div><strong>ปิดง่ายสุด: '+escapeHtml(smallest.name)+'</strong><div class="reason">ยอดคงเหลือน้อยสุด '+fmtBaht(smallest.remaining)+' เหมาะถ้าต้องการลดจำนวนเจ้าหนี้เร็ว</div></div></div></div>';
+      '<div class="quick-answer-grid"><div class="quick-card danger"><span>🔥 แพงสุด</span><strong>'+escapeHtml(expensive.name)+'</strong><small>ดอก '+Number(expensive.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'% ต่อปี</small></div><div class="quick-card success"><span>⚡ ปิดง่ายสุด</span><strong>'+escapeHtml(smallest.name)+'</strong><small>เหลือ '+fmtBaht(smallest.remaining)+'</small></div></div>';
   }
 
   var currentDetailLoanId = null;

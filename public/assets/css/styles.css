@@ -132,6 +132,7 @@
     user-select:none;
   }
   .tab.active{background:var(--card); color:var(--ink); box-shadow:var(--shadow);}
+  @media(max-width:380px){.tab{font-size:11.5px;padding:9px 3px}.summary-total{font-size:29px}.summary-chips{flex-wrap:wrap}.summary-chips span{flex:1}.priority-item{gap:8px}.priority-money strong{font-size:12px}}
 
   /* month nav */
   .monthnav{
@@ -361,16 +362,43 @@
     font-size:14.5px;
   }
   .field .subnote{font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
+  .summary-hero{background:linear-gradient(145deg,var(--plum),#4f3766);color:#fff;border-radius:24px;padding:22px;margin-bottom:14px;position:relative;overflow:hidden;box-shadow:0 12px 30px rgba(90,62,108,.2);}
+  .summary-hero:after{content:'฿';position:absolute;right:-8px;top:-32px;font:bold 150px/1 serif;color:rgba(255,255,255,.07);}
+  .summary-eyebrow,.section-kicker{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;opacity:.78;}
+  .summary-total{font-size:34px;font-weight:800;line-height:1.15;margin-top:5px;}
+  .summary-caption{font-size:12px;opacity:.76;}
+  .summary-chips{display:flex;gap:8px;margin-top:17px;position:relative;z-index:1;}
+  .summary-chips span{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.14);border-radius:12px;padding:8px 10px;font-size:11px;backdrop-filter:blur(5px);}
+  .summary-chips strong{display:block;font-size:14px;margin-top:2px;}
   .debt-summary-card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow);}
-  .debt-summary-card h2,.debt-summary-card h3{margin:0 0 8px;}
+  .debt-summary-card h2,.debt-summary-card h3{margin:2px 0 8px;}
+  .section-kicker{color:var(--plum);opacity:1;}
+  .section-title-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .recommended-pill,.bank-pill{font-size:10px;font-weight:700;border-radius:20px;padding:5px 8px;background:var(--plum-soft);color:var(--plum);white-space:nowrap;}
   .debt-summary-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:12px;}
   .debt-metric{background:var(--card-2);border-radius:14px;padding:12px;}
   .debt-metric .lab{display:block;color:var(--ink-soft);font-size:11px;margin-bottom:3px;}
   .debt-metric .val{font-weight:800;font-size:17px;}
+  .debt-bars{display:flex;flex-direction:column;gap:14px;margin-top:16px;}
+  .debt-bar-head{display:flex;justify-content:space-between;gap:10px;font-size:12px;}
+  .debt-bar-track{height:9px;background:var(--card-2);border-radius:10px;overflow:hidden;margin-top:6px;}
+  .debt-bar-fill{height:100%;border-radius:10px;background:var(--plum);}
+  .debt-bar-fill.color-1{background:var(--coral)}.debt-bar-fill.color-2{background:var(--mustard)}.debt-bar-fill.color-3{background:var(--sky)}.debt-bar-fill.color-4{background:var(--mint)}
+  .debt-bar-meta{font-size:10px;color:var(--ink-soft);margin-top:4px;}
+  .payoff-flow{display:flex;align-items:stretch;justify-content:space-between;gap:6px;margin-top:15px;}
+  .payoff-flow>div{flex:1;text-align:center;background:var(--card-2);padding:12px 5px;border-radius:14px;font-size:10px;}
+  .payoff-flow>div.focus{background:var(--plum-soft);color:var(--plum);}
+  .payoff-flow b{width:24px;height:24px;display:flex;align-items:center;justify-content:center;margin:0 auto 7px;border-radius:50%;background:var(--card);color:var(--plum);}
+  .payoff-flow i{align-self:center;color:var(--ink-faint);font-style:normal;font-weight:800;}
   .priority-list{display:flex;flex-direction:column;gap:9px;margin-top:12px;}
   .priority-item{display:flex;justify-content:space-between;gap:12px;padding:12px;background:var(--card-2);border-radius:14px;align-items:center;}
-  .priority-item .rank{font-weight:800;color:var(--plum);margin-right:7px;}
+  .priority-rank{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--plum);color:#fff;border-radius:9px;font-size:12px;font-weight:800;flex:0 0 auto;}
+  .priority-main{flex:1;min-width:0;}.priority-money{text-align:right;white-space:nowrap;}.priority-money span{display:block;font-size:10px;color:var(--ink-soft);}
   .priority-item .reason{font-size:11px;color:var(--ink-soft);margin-top:3px;}
+  .quick-answer-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+  .quick-card{border-radius:18px;padding:15px;border:1px solid var(--line);background:var(--card);display:flex;flex-direction:column;gap:4px;}
+  .quick-card span{font-size:11px;font-weight:700;}.quick-card strong{font-size:15px;}.quick-card small{color:var(--ink-soft);}
+  .quick-card.danger{border-color:var(--coral);background:var(--coral-soft)}.quick-card.success{border-color:var(--mint);background:var(--mint-soft)}
   .chips{display:flex; flex-wrap:wrap; gap:8px;}
   .chip{
     padding:8px 12px;
