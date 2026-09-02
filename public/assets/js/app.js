@@ -334,10 +334,28 @@
     state.bills.forEach(function(b){addEvent(Math.min(b.dueDay,count),{name:b.name,type:'bill'});});
     state.loans.filter(function(l){return isLoanActiveInMonth(l,viewYear,viewMonth);}).forEach(function(l){addEvent(Math.min(l.dueDay,count),{name:l.name,type:'loan'});});
     var cells='';for(var blank=0;blank<firstDay;blank++)cells+='<div class="calendar-day muted"></div>';
-    for(var day=1;day<=count;day++){var isToday=isCurrentMonth()&&today.getDate()===day;cells+='<div class="calendar-day'+(isToday?' today':'')+'"><div class="calendar-number">'+day+'</div>'+((events[day]||[]).map(function(event){return '<div class="calendar-event is-'+event.type+'" title="'+escapeHtml(event.name)+'">'+escapeHtml(event.name)+'</div>';}).join(''))+'</div>';}
+    for(var day=1;day<=count;day++){var isToday=isCurrentMonth()&&today.getDate()===day;cells+='<div class="calendar-day'+(isToday?' today':'')+'" data-calendar-day="'+day+'" role="button" tabindex="0"><div class="calendar-number">'+day+'</div>'+((events[day]||[]).map(function(event){return '<div class="calendar-event is-'+event.type+'" title="'+escapeHtml(event.name)+'">'+escapeHtml(event.name)+'</div>';}).join(''))+'</div>';}
     var labels=['อา','จ','อ','พ','พฤ','ศ','ส'].map(function(label){return '<div class="calendar-weekday">'+label+'</div>';}).join('');
     listArea.innerHTML='<div class="debt-summary-card"><div class="section-title-row"><div><div class="section-kicker">CALENDAR</div><h3>วันครบกำหนดทั้งหมด</h3></div></div><div class="calendar-legend"><span><i class="legend-dot"></i>บิล</span><span><i class="legend-dot loan"></i>สินเชื่อ</span></div><div class="calendar-grid">'+labels+cells+'</div></div>';
+    listArea.querySelectorAll('[data-calendar-day]').forEach(function(cell){
+      function open(){openCalendarDay(Number(cell.dataset.calendarDay));}
+      cell.addEventListener('click',open);
+      cell.addEventListener('keydown',function(event){if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});
+    });
   }
+
+  function openCalendarDay(day){
+    var items=[];
+    state.bills.forEach(function(bill){if(Math.min(bill.dueDay,daysInMonth(viewYear,viewMonth))!==day)return;var row=computeRow(bill,bill.dueDay,getPayment(state.payments,bill.id));items.push({type:'bill',item:bill,row:row,amount:row.paid?Number(row.pay.amount||bill.amount):Number(bill.amount||0)});});
+    state.loans.filter(function(loan){return isLoanActiveInMonth(loan,viewYear,viewMonth);}).forEach(function(loan){if(Math.min(loan.dueDay,daysInMonth(viewYear,viewMonth))!==day)return;var row=computeRow(loan,loan.dueDay,getPayment(state.loanPayments,loan.id));items.push({type:'loan',item:loan,row:row,amount:row.paid?Number(row.pay.amount||0):loanPaymentForMonth(loan,viewYear,viewMonth)});});
+    document.getElementById('calendarDayTitle').textContent=day+' '+MONTH_NAMES[viewMonth]+' '+(viewYear+543);
+    document.getElementById('calendarDayContent').innerHTML=items.length?items.map(function(entry){var item=entry.item,row=entry.row,status=row.paid?'จ่ายแล้ว':row.status==='overdue'?'เลยกำหนด':row.status==='soon'?'ใกล้ครบกำหนด':'รอจ่าย';return '<button class="calendar-detail-item '+entry.type+'" data-calendar-type="'+entry.type+'" data-calendar-id="'+item.id+'"><span class="calendar-detail-icon">'+(entry.type==='loan'?'🏦':(item.icon||catInfo(item.category).icon))+'</span><span class="calendar-detail-main"><strong>'+escapeHtml(item.name)+'</strong><small>'+status+(entry.type==='loan'&&item.bank?' · '+escapeHtml(item.bank):'')+(item.note?' · '+escapeHtml(item.note):'')+'</small></span><span class="calendar-detail-money">'+fmtBaht(entry.amount)+'</span></button>';}).join(''):'<div class="empty"><span class="em-emoji">📭</span>วันนี้ไม่มีรายการครบกำหนด</div>';
+    document.getElementById('calendarDayContent').querySelectorAll('[data-calendar-id]').forEach(function(button){button.addEventListener('click',function(){var type=button.dataset.calendarType,id=button.dataset.calendarId;document.getElementById('calendarDayOverlay').classList.remove('show');if(type==='loan'){var loan=state.loans.find(function(item){return item.id===id;});if(loan)openLoanDetailSheet(loan);}else{var bill=state.bills.find(function(item){return item.id===id;});if(bill)openEditBillSheet(bill);}});});
+    document.getElementById('calendarDayOverlay').classList.add('show');
+  }
+
+  document.getElementById('closeCalendarDay').addEventListener('click',function(){document.getElementById('calendarDayOverlay').classList.remove('show');});
+  document.getElementById('calendarDayOverlay').addEventListener('click',function(event){if(event.target===this)this.classList.remove('show');});
 
   function billSparklineHtml(bill){
     var values=[];
