@@ -635,15 +635,15 @@
 
   function reportOverviewHtml(loans){
     var current=monthPaidTotal(viewYear,viewMonth),prevDate=new Date(viewYear,viewMonth-1,1),previous=monthPaidTotal(prevDate.getFullYear(),prevDate.getMonth());
-    var original=state.loans.reduce(function(sum,l){return sum+Math.max(Number(l.totalAmount||0),Number(l.remaining||0));},0),remaining=state.loans.reduce(function(sum,l){return sum+Number(l.remaining||0);},0),pct=original?Math.max(0,Math.min(100,Math.round((original-remaining)/original*100))):0;
-    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card"><div class="section-kicker">MONTH ON MONTH</div><h3>จ่ายรวมเดือนนี้</h3><div class="report-number">'+fmtBaht(current)+'</div>'+comparisonHtml(current,previous)+'</div><div class="debt-summary-card lifetime-card"><div class="lifetime-ring" style="--progress:'+(pct*3.6)+'deg"><div><strong>'+pct+'%</strong><small>ปลดหนี้แล้ว</small></div></div><p>จากหนี้ทั้งหมดที่เคยมี '+fmtBaht(original)+'</p></div></div>';
+    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card report-wide month-compare"><div><div class="section-kicker">MONTH ON MONTH</div><h3>เทียบค่าใช้จ่ายเดือนก่อน</h3></div>'+comparisonHtml(current,previous)+'</div></div>';
   }
 
   function renderDebtSummary(){
     var listArea = document.getElementById('listArea');
     var loans = state.loans.filter(function(loan){return Number(loan.remaining||0)>0;});
     if(!loans.length){
-      listArea.innerHTML = '<div class="summary-hero"><div class="summary-eyebrow">รายงานการเงินของคุณ</div><div class="summary-total">฿0</div><div class="summary-caption">ไม่มีหนี้คงเหลือแล้ว 🎉</div></div>'+reportOverviewHtml([]);
+      var paidNoDebt=monthPaidTotal(viewYear,viewMonth);
+      listArea.innerHTML = '<div class="summary-hero"><div class="summary-eyebrow">รวมค่าใช้จ่ายเดือนนี้</div><div class="summary-total">'+fmtBaht(paidNoDebt)+'</div><div class="summary-caption">ยอดที่บันทึกว่าจ่ายแล้วทั้งหมด</div><div class="hero-debt-pair"><div><small>หนี้คงเหลือ</small><strong>฿0</strong></div><div><strong>100%</strong><small>ปลดหนี้แล้ว 🎉</small></div></div></div>'+reportOverviewHtml([]);
       return;
     }
     var totalDebt = loans.reduce(function(sum,loan){return sum+Number(loan.remaining||0);},0);
@@ -655,6 +655,9 @@
     var expensive = avalanche[0];
     var smallest = snowball[0];
     var maxDebt = Math.max.apply(null,loans.map(function(loan){return Number(loan.remaining||0);}));
+    var paidAllThisMonth=monthPaidTotal(viewYear,viewMonth),previousDate=new Date(viewYear,viewMonth-1,1),previousPaid=monthPaidTotal(previousDate.getFullYear(),previousDate.getMonth());
+    var originalDebt=state.loans.reduce(function(sum,loan){return sum+Math.max(Number(loan.totalAmount||0),Number(loan.remaining||0));},0);
+    var lifetimePct=originalDebt?Math.max(0,Math.min(100,Math.round((originalDebt-totalDebt)/originalDebt*100))):0;
 
     function priorityRows(items){
       return items.map(function(loan,index){
@@ -672,7 +675,7 @@
     }).join('');
 
     listArea.innerHTML =
-      '<div class="summary-hero"><div class="summary-eyebrow">รายงานการเงินของคุณ</div><div class="summary-total">'+fmtBaht(totalDebt)+'</div><div class="summary-caption">ยอดหนี้คงเหลือทั้งหมด</div><div class="summary-chips"><span>จ่ายเดือนนี้ <strong>'+fmtBaht(totalPayment)+'</strong></span><span>ดอก/เดือน <strong>'+fmtBaht(monthlyInterest)+'</strong></span></div></div>'+reportOverviewHtml(loans)+
+      '<div class="summary-hero"><div class="summary-eyebrow">รวมค่าใช้จ่ายเดือนนี้</div><div class="summary-total">'+fmtBaht(paidAllThisMonth)+'</div><div class="summary-caption">ยอดที่บันทึกว่าจ่ายแล้วทั้งหมด · '+comparisonHtml(paidAllThisMonth,previousPaid)+'</div><div class="hero-debt-pair"><div><small>หนี้คงเหลือทั้งหมด</small><strong>'+fmtBaht(totalDebt)+'</strong></div><div class="hero-progress-mini" style="--progress:'+(lifetimePct*3.6)+'deg"><span>'+lifetimePct+'%</span><small>ปลดหนี้แล้ว</small></div></div></div>'+reportOverviewHtml(loans)+
       '<div class="debt-summary-card"><div class="section-kicker">DEBT MAP</div><h3>หนี้อยู่ตรงไหนบ้าง</h3><div class="debt-bars">'+debtBars+'</div></div>'+
       '<div class="debt-summary-card"><h3>ตัวเลขสำคัญ</h3><div class="debt-summary-grid">'+
         '<div class="debt-metric"><span class="lab">หนี้คงเหลือรวม</span><span class="val">'+fmtBaht(totalDebt)+'</span></div>'+
