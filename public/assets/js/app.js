@@ -25,7 +25,7 @@
         {id:uid(), category:'rent', name:'ค่าคอนโด', amount:8000, dueDay:1, recurring:true, note:''}
       ],
       loans: [
-        {id:uid(), name:'สินเชื่อตัวอย่าง', totalAmount:0, remaining:4500, monthlyPayment:4500, dueDay:15, note:''}
+        {id:uid(), name:'สินเชื่อตัวอย่าง', totalAmount:0, remaining:4500, monthlyPayment:4500, interestRate:0, dueDay:15, note:''}
       ],
       payments: {},
       loanPayments: {},
@@ -98,6 +98,38 @@
   function fmtBaht(n){
     n = Math.round(n||0);
     return '฿' + n.toLocaleString('th-TH');
+  }
+
+  function loanProjection(loan){
+    var principal = Math.max(0, Number(loan.remaining)||0);
+    var payment = Math.max(0, Number(loan.monthlyPayment)||0);
+    var annualRate = Math.max(0, Number(loan.interestRate)||0);
+    var monthlyRate = annualRate / 1200;
+    var nextInterest = principal * monthlyRate;
+    if(principal<=0) return {months:0, nextInterest:0, totalInterest:0, payable:true};
+    if(payment<=0) return {months:null, nextInterest:nextInterest, totalInterest:null, payable:false};
+    if(monthlyRate<=0){
+      var zeroMonths = Math.ceil(principal/payment);
+      return {months:zeroMonths, nextInterest:0, totalInterest:0, payable:true};
+    }
+    if(payment<=nextInterest) return {months:null, nextInterest:nextInterest, totalInterest:null, payable:false};
+    var months = Math.ceil(-Math.log(1-(monthlyRate*principal/payment))/Math.log(1+monthlyRate));
+    var balance = principal;
+    var totalInterest = 0;
+    for(var i=0;i<months && balance>0;i++){
+      var interest = balance*monthlyRate;
+      var actualPayment = Math.min(payment, balance+interest);
+      totalInterest += interest;
+      balance = Math.max(0, balance-(actualPayment-interest));
+    }
+    return {months:months, nextInterest:nextInterest, totalInterest:totalInterest, payable:true};
+  }
+
+  function loanPaymentBreakdown(loan, amount){
+    var remaining = Math.max(0, Number(loan.remaining)||0);
+    var interest = remaining * (Math.max(0, Number(loan.interestRate)||0) / 1200);
+    var paid = Math.max(0, Number(amount)||0);
+    return {interest:Math.min(paid, interest), principal:Math.min(remaining, Math.max(0, paid-interest))};
   }
 
   function isCurrentMonth(){
@@ -350,9 +382,14 @@
           '<div class="loan-progress-label">ผ่อนไปแล้ว '+offPct+'% ของยอดกู้ '+fmtBaht(loan.totalAmount)+'</div>';
       }
       if(loan.remaining>0 && loan.monthlyPayment>0){
-        var monthsLeft = Math.ceil(loan.remaining/loan.monthlyPayment);
-        var payoff = new Date(viewYear, viewMonth + monthsLeft, 1);
-        progressHtml += '<div class="loan-progress-label">เหลืออีกประมาณ '+monthsLeft+' งวด · จ่ายครบราวเดือน'+MONTH_NAMES[payoff.getMonth()]+' '+(payoff.getFullYear()+543)+'</div>';
+        var projection = loanProjection(loan);
+        if(projection.payable){
+          var monthsLeft = projection.months;
+          var payoff = new Date(viewYear, viewMonth + monthsLeft, 1);
+          progressHtml += '<div class="loan-progress-label">ดอกเบี้ย '+Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'%/ปี · เหลือประมาณ '+monthsLeft+' งวด · จ่ายครบราวเดือน'+MONTH_NAMES[payoff.getMonth()]+' '+(payoff.getFullYear()+543)+'</div>';
+        } else {
+          progressHtml += '<div class="loan-progress-label" style="color:var(--coral)">⚠️ ค่างวดไม่สูงกว่าดอกเบี้ยต่อเดือน หนี้จะไม่ลด</div>';
+        }
       } else if(loan.remaining<=0){
         progressHtml += '<div class="loan-progress-label">ผ่อนครบแล้ว 🎉</div>';
       }
@@ -409,7 +446,8 @@
     if(r.paid){
       if(confirm('ยกเลิกสถานะ "จ่ายงวดแล้ว" ของ '+loan.name+' ใช่ไหม? ยอดคงเหลือจะถูกบวกกลับคืน')){
         var amt = Number((r.pay && r.pay.amount) || loan.monthlyPayment || 0);
-        loan.remaining = Number(loan.remaining||0) + amt;
+        var principalPaid = Number(r.pay && r.pay.principalAmount);
+        loan.remaining = Number(loan.remaining||0) + (Number.isFinite(principalPaid) ? principalPaid : amt);
         setPayment(state.loanPayments, loan.id, null);
         refreshAfterLoanChange(loan);
       }
@@ -422,14 +460,19 @@
       '<input type="number" value="'+loan.monthlyPayment+'" min="0" step="1">'+
       '<button class="ok">ยืนยันจ่ายงวดแล้ว</button>'+
       '<button class="cancel">ยกเลิก</button>'+
-      '<div class="hint">ยอดนี้จะถูกหักออกจากยอดคงเหลืออัตโนมัติ</div>';
+      '<div class="hint">ระบบจะหักดอกเบี้ยของงวดก่อน แล้วนำส่วนที่เหลือไปลดเงินต้น</div>';
     container.appendChild(row);
     row.querySelector('input').focus();
     row.querySelector('.ok').addEventListener('click', function(ev){
       ev.stopPropagation();
       var amt = Number(row.querySelector('input').value) || loan.monthlyPayment;
-      loan.remaining = Math.max(0, Number(loan.remaining||0) - amt);
-      setPayment(state.loanPayments, loan.id, {paid:true, amount:amt, paidAt: new Date().toISOString()});
+      var breakdown = loanPaymentBreakdown(loan, amt);
+      if(Number(loan.remaining||0)>0 && breakdown.principal<=0){
+        alert('ยอดชำระต้องสูงกว่าดอกเบี้ยงวดนี้ ('+fmtBaht(breakdown.interest)+') เพื่อให้เงินต้นลดลง');
+        return;
+      }
+      loan.remaining = Math.max(0, Number(loan.remaining||0) - breakdown.principal);
+      setPayment(state.loanPayments, loan.id, {paid:true, amount:amt, principalAmount:breakdown.principal, interestAmount:breakdown.interest, paidAt: new Date().toISOString()});
       refreshAfterLoanChange(loan);
     });
     row.querySelector('.cancel').addEventListener('click', function(ev){
@@ -472,8 +515,9 @@
     ring.style.strokeDasharray = circumference;
     ring.style.strokeDashoffset = circumference - (circumference * Math.min(pct,100)/100);
 
-    if(loan.remaining>0 && loan.monthlyPayment>0){
-      var monthsLeft = Math.ceil(loan.remaining/loan.monthlyPayment);
+    var projection = loanProjection(loan);
+    if(loan.remaining>0 && loan.monthlyPayment>0 && projection.payable){
+      var monthsLeft = projection.months;
       var payoff = new Date(viewYear, viewMonth + monthsLeft, 1);
       document.getElementById('detailMonthsLeft').textContent = monthsLeft + ' งวด';
       document.getElementById('detailPayoff').textContent = MONTH_NAMES[payoff.getMonth()] + ' ' + (payoff.getFullYear()+543);
@@ -481,13 +525,16 @@
       document.getElementById('detailMonthsLeft').textContent = 'ผ่อนครบแล้ว 🎉';
       document.getElementById('detailPayoff').textContent = '-';
     } else {
-      document.getElementById('detailMonthsLeft').textContent = '-';
+      document.getElementById('detailMonthsLeft').textContent = projection.payable ? '-' : 'ค่างวดต่ำเกินไป';
       document.getElementById('detailPayoff').textContent = '-';
     }
 
     document.getElementById('detailTotal').textContent = (loan.totalAmount && loan.totalAmount>0) ? fmtBaht(loan.totalAmount) : 'ไม่ระบุ';
     document.getElementById('detailPaidOffPct').textContent = (loan.totalAmount && loan.totalAmount>0) ? pct+'%' : 'ไม่ระบุ';
     document.getElementById('detailMonthly').textContent = fmtBaht(loan.monthlyPayment);
+    document.getElementById('detailInterestRate').textContent = Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2}) + '% ต่อปี';
+    document.getElementById('detailNextInterest').textContent = fmtBaht(projection.nextInterest);
+    document.getElementById('detailEstimatedInterest').textContent = projection.totalInterest===null ? 'คำนวณไม่ได้' : fmtBaht(projection.totalInterest);
     document.getElementById('detailDue').textContent = 'วันที่ '+loan.dueDay+' · '+dueText(r);
 
     var noteRow = document.getElementById('detailNoteRow');
@@ -663,6 +710,7 @@
     document.getElementById('lTotal').value = '';
     document.getElementById('lRemaining').value = '';
     document.getElementById('lMonthly').value = '';
+    document.getElementById('lInterestRate').value = '';
     document.getElementById('lDueDay').value = '';
     document.getElementById('lNote').value = '';
     document.getElementById('deleteLoanBtn').style.display = 'none';
@@ -676,6 +724,7 @@
     document.getElementById('lTotal').value = loan.totalAmount || '';
     document.getElementById('lRemaining').value = loan.remaining;
     document.getElementById('lMonthly').value = loan.monthlyPayment;
+    document.getElementById('lInterestRate').value = Number(loan.interestRate)||0;
     document.getElementById('lDueDay').value = loan.dueDay;
     document.getElementById('lNote').value = loan.note||'';
     document.getElementById('deleteLoanBtn').style.display = 'block';
@@ -690,15 +739,16 @@
     var totalAmount = Number(document.getElementById('lTotal').value) || 0;
     var remaining = Number(document.getElementById('lRemaining').value) || 0;
     var monthlyPayment = Number(document.getElementById('lMonthly').value) || 0;
+    var interestRate = Math.min(100, Math.max(0, Number(document.getElementById('lInterestRate').value) || 0));
     var dueDay = Math.min(31, Math.max(1, Number(document.getElementById('lDueDay').value) || 1));
     var note = document.getElementById('lNote').value.trim();
     if(!name){ alert('ใส่ชื่อสินเชื่อก่อนนะ'); return; }
 
     if(editingLoanId){
       var l = state.loans.find(function(x){return x.id===editingLoanId;});
-      if(l){ l.name=name; l.totalAmount=totalAmount; l.remaining=remaining; l.monthlyPayment=monthlyPayment; l.dueDay=dueDay; l.note=note; }
+      if(l){ l.name=name; l.totalAmount=totalAmount; l.remaining=remaining; l.monthlyPayment=monthlyPayment; l.interestRate=interestRate; l.dueDay=dueDay; l.note=note; }
     } else {
-      state.loans.push({id:uid(), name:name, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, dueDay:dueDay, note:note});
+      state.loans.push({id:uid(), name:name, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, interestRate:interestRate, dueDay:dueDay, note:note});
     }
     saveState();
     loanOverlay.classList.remove('show');
