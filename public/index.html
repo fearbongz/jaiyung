@@ -29,14 +29,15 @@
     <button class="gear-btn" id="settingsBtn" aria-label="ตั้งค่า">⚙️</button>
   </header>
 
-  <div class="tabs">
-    <div class="tab active" id="tabDashboard">🏠 วันนี้</div>
-    <div class="tab" id="tabBills">🧾 บิล</div>
-    <div class="tab" id="tabLoans">🏦 สินเชื่อ</div>
-    <div class="tab" id="tabCalendar">📅 ปฏิทิน</div>
-    <div class="tab" id="tabSavings">💰 ออม</div>
-    <div class="tab" id="tabSummary">📊 สรุปหนี้</div>
+  <div class="tabs" aria-label="เมนูหลัก">
+    <div class="tab active" id="tabBills">🧾<span>บิล</span></div>
+    <div class="tab" id="tabLoans">🏦<span>สินเชื่อ</span></div>
+    <div class="tab" id="tabCalendar">📅<span>ปฏิทิน</span></div>
+    <div class="tab" id="tabSavings">🎯<span>เป้าหมาย</span></div>
+    <div class="tab" id="tabSummary">📊<span>รายงาน</span></div>
   </div>
+
+  <div class="overall-status" id="overallStatus"></div>
 
   <div class="monthnav" id="monthNav" style="display:none;">
     <button id="prevMonth">‹</button>
@@ -61,6 +62,7 @@
       <div class="hero-row remain"><span class="lab">คงเหลือต้องจ่าย</span><span class="val" id="remainVal">฿0</span></div>
       <div class="hero-div" id="budgetDiv" style="display:none;"></div>
       <div class="hero-row left" id="budgetRow" style="display:none;"><span class="lab">เหลือใช้เดือนนี้</span><span class="val" id="leftVal">฿0</span></div>
+      <div class="hero-row daily" id="dailyRow" style="display:none;"><span class="lab">เหลือใช้ต่อวัน</span><span class="val" id="dailySpendVal">฿0</span></div>
     </div>
   </div>
 

@@ -93,7 +93,7 @@
   var today = new Date();
   var viewYear = today.getFullYear();
   var viewMonth = today.getMonth(); // 0-11
-  var activeTab = 'dashboard';
+  var activeTab = 'bills';
 
   var MONTH_NAMES = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
 
@@ -269,7 +269,6 @@
   /* ---------- TABS ---------- */
   function setTab(tab){
     activeTab = tab;
-    document.getElementById('tabDashboard').classList.toggle('active', tab==='dashboard');
     document.getElementById('tabBills').classList.toggle('active', tab==='bills');
     document.getElementById('tabLoans').classList.toggle('active', tab==='loans');
     document.getElementById('tabCalendar').classList.toggle('active', tab==='calendar');
@@ -277,11 +276,10 @@
     document.getElementById('tabSummary').classList.toggle('active', tab==='summary');
     document.getElementById('billsHero').style.display = tab==='bills' ? 'flex' : 'none';
     document.getElementById('loansHero').style.display = tab==='loans' ? 'flex' : 'none';
-    document.getElementById('monthNav').style.display = (tab==='bills'||tab==='loans'||tab==='calendar') ? 'flex' : 'none';
+    document.getElementById('monthNav').style.display = (tab==='bills'||tab==='loans'||tab==='calendar'||tab==='summary') ? 'flex' : 'none';
     document.getElementById('addBtn').style.display = (tab==='bills'||tab==='loans'||tab==='savings') ? '' : 'none';
     render();
   }
-  document.getElementById('tabDashboard').addEventListener('click', function(){ setTab('dashboard'); });
   document.getElementById('tabBills').addEventListener('click', function(){ setTab('bills'); });
   document.getElementById('tabLoans').addEventListener('click', function(){ setTab('loans'); });
   document.getElementById('tabCalendar').addEventListener('click', function(){ setTab('calendar'); });
@@ -291,12 +289,22 @@
   /* ---------- RENDER ---------- */
   function render(){
     document.getElementById('monthLabel').textContent = MONTH_NAMES[viewMonth] + ' ' + (viewYear+543);
-    if(activeTab==='dashboard') renderDashboard();
-    else if(activeTab==='bills') renderBills();
+    renderOverallStatus();
+    if(activeTab==='bills') renderBills();
     else if(activeTab==='loans') renderLoans();
     else if(activeTab==='calendar') renderCalendar();
     else if(activeTab==='savings') renderSavings();
     else renderDebtSummary();
+  }
+
+  function renderOverallStatus(){
+    var rows=[];
+    state.bills.forEach(function(item){rows.push(computeRow(item,item.dueDay,getPayment(state.payments,item.id)));});
+    state.loans.filter(function(item){return isLoanActiveInMonth(item,viewYear,viewMonth);}).forEach(function(item){rows.push(computeRow(item,item.dueDay,getPayment(state.loanPayments,item.id)));});
+    var paid=rows.filter(function(row){return row.paid;}).length;
+    var overdue=rows.filter(function(row){return row.status==='overdue';}).length;
+    var waiting=Math.max(0,rows.length-paid-overdue),total=Math.max(1,rows.length);
+    document.getElementById('overallStatus').innerHTML='<div class="overall-status-head"><strong>สถานะรวม '+rows.length+' รายการ</strong><span>จ่ายแล้ว '+paid+' · รอจ่าย '+waiting+' · เลยกำหนด '+overdue+'</span></div><div class="status-track" aria-label="จ่ายแล้ว '+paid+' รอจ่าย '+waiting+' เลยกำหนด '+overdue+'"><i class="status-paid" style="width:'+(paid/total*100)+'%"></i><i class="status-wait" style="width:'+(waiting/total*100)+'%"></i><i class="status-overdue" style="width:'+(overdue/total*100)+'%"></i></div>';
   }
 
   function renderDashboard(){
@@ -326,9 +334,22 @@
     state.bills.forEach(function(b){addEvent(Math.min(b.dueDay,count),{name:b.name,type:'bill'});});
     state.loans.filter(function(l){return isLoanActiveInMonth(l,viewYear,viewMonth);}).forEach(function(l){addEvent(Math.min(l.dueDay,count),{name:l.name,type:'loan'});});
     var cells='';for(var blank=0;blank<firstDay;blank++)cells+='<div class="calendar-day muted"></div>';
-    for(var day=1;day<=count;day++){var isToday=isCurrentMonth()&&today.getDate()===day;cells+='<div class="calendar-day'+(isToday?' today':'')+'"><div class="calendar-number">'+day+'</div>'+((events[day]||[]).map(function(event){return '<div class="calendar-event '+event.type+'" title="'+escapeHtml(event.name)+'">'+escapeHtml(event.name)+'</div>';}).join(''))+'</div>';}
+    for(var day=1;day<=count;day++){var isToday=isCurrentMonth()&&today.getDate()===day;cells+='<div class="calendar-day'+(isToday?' today':'')+'"><div class="calendar-number">'+day+'</div>'+((events[day]||[]).map(function(event){return '<div class="calendar-event is-'+event.type+'" title="'+escapeHtml(event.name)+'">'+escapeHtml(event.name)+'</div>';}).join(''))+'</div>';}
     var labels=['อา','จ','อ','พ','พฤ','ศ','ส'].map(function(label){return '<div class="calendar-weekday">'+label+'</div>';}).join('');
     listArea.innerHTML='<div class="debt-summary-card"><div class="section-title-row"><div><div class="section-kicker">CALENDAR</div><h3>วันครบกำหนดทั้งหมด</h3></div></div><div class="calendar-legend"><span><i class="legend-dot"></i>บิล</span><span><i class="legend-dot loan"></i>สินเชื่อ</span></div><div class="calendar-grid">'+labels+cells+'</div></div>';
+  }
+
+  function billSparklineHtml(bill){
+    var values=[];
+    for(var offset=5;offset>=0;offset--){
+      var date=new Date(viewYear,viewMonth-offset,1),pay=(state.payments[monthKey(date.getFullYear(),date.getMonth())]||{})[bill.id];
+      values.push(pay&&pay.paid?Number(pay.amount||0):null);
+    }
+    var known=values.filter(function(value){return value!==null;});
+    if(known.length<2)return '<div class="bill-spark-empty">ยังไม่มีประวัติพอสำหรับกราฟ</div>';
+    var min=Math.min.apply(null,known),max=Math.max.apply(null,known),range=Math.max(1,max-min),points=[];
+    values.forEach(function(value,index){if(value!==null)points.push((index*20)+','+(24-(value-min)/range*20));});
+    return '<div class="bill-spark"><svg viewBox="0 0 100 28" role="img" aria-label="ยอดย้อนหลัง 6 เดือน"><polyline points="'+points.join(' ')+'"/></svg><span>6 เดือน</span></div>';
   }
 
   function renderBills(){
@@ -362,9 +383,13 @@
       var leftEl = document.getElementById('leftVal');
       leftEl.textContent = fmtBaht(left);
       leftEl.style.color = left < 0 ? 'var(--coral)' : 'var(--sky)';
+      var daysLeft=isCurrentMonth()?daysInMonth(viewYear,viewMonth)-today.getDate()+1:(isPastMonth()?0:daysInMonth(viewYear,viewMonth));
+      document.getElementById('dailyRow').style.display=daysLeft?'flex':'none';
+      document.getElementById('dailySpendVal').textContent=daysLeft?fmtBaht(left/daysLeft):'—';
     } else {
       document.getElementById('budgetRow').style.display='none';
       document.getElementById('budgetDiv').style.display='none';
+      document.getElementById('dailyRow').style.display='none';
     }
 
     var listArea = document.getElementById('listArea');
@@ -390,7 +415,7 @@
         '<div class="bicon">'+icon+'</div>'+
         '<div class="binfo">'+
           '<div class="bname"><span class="'+(r.paid?'strike':'')+'">'+escapeHtml(bill.name)+'</span>'+badgeHtml+'</div>'+
-          '<div class="bdue">'+dueText(r)+(bill.note? ' · '+escapeHtml(bill.note):'')+'</div>'+
+          '<div class="bdue">'+dueText(r)+(bill.note? ' · '+escapeHtml(bill.note):'')+'</div>'+billSparklineHtml(bill)+
         '</div>'+
         '<div class="bactions">'+
           '<div class="bamt">'+fmtBaht(r.paid ? ((r.pay&&r.pay.amount)||bill.amount) : bill.amount)+'</div>'+
@@ -558,11 +583,53 @@
     makeSection('สินเชื่อเก่าสุด → ใหม่สุด', rows.slice().sort(function(a,b){return a.loanOrder-b.loanOrder;}));
   }
 
+  function monthPaidTotal(year,month){
+    var key=monthKey(year,month),sum=0;
+    Object.keys(state.payments[key]||{}).forEach(function(id){var p=state.payments[key][id];if(p&&p.paid)sum+=Number(p.amount||0);});
+    Object.keys(state.loanPayments[key]||{}).forEach(function(id){var p=state.loanPayments[key][id];if(p&&p.paid)sum+=Number(p.amount||0);});
+    return sum;
+  }
+
+  function comparisonHtml(current,previous){
+    if(!previous)return '<span class="trend neutral">ยังไม่มีข้อมูลเดือนก่อน</span>';
+    var pct=Math.round((current-previous)/previous*100),down=pct<0;
+    return '<span class="trend '+(down?'down':'up')+'">'+(down?'▼':'▲')+Math.abs(pct)+'% จากเดือนก่อน</span>';
+  }
+
+  function expenseDonutHtml(){
+    var key=monthKey(viewYear,viewMonth),groups={},total=0,colors=['var(--coral)','var(--sky)','var(--mustard)','var(--plum)','var(--mint)','#9b7653','#7d8b91'];
+    state.bills.forEach(function(bill){var pay=(state.payments[key]||{})[bill.id],amount=Number(pay&&pay.paid?pay.amount:bill.amount)||0;groups[bill.category]=(groups[bill.category]||0)+amount;total+=amount;});
+    var entries=Object.keys(groups).sort(function(a,b){return groups[b]-groups[a];}),cursor=0,stops=[];
+    entries.forEach(function(id,index){var end=cursor+(total?groups[id]/total*100:0);stops.push(colors[index%colors.length]+' '+cursor+'% '+end+'%');cursor=end;});
+    var legend=entries.map(function(id,index){return '<div class="donut-row"><span><i style="background:'+colors[index%colors.length]+'"></i>'+escapeHtml(catInfo(id).name)+'</span><strong>'+fmtBaht(groups[id])+'</strong></div>';}).join('');
+    return '<div class="expense-donut-wrap"><div class="expense-donut" style="background:conic-gradient('+(stops.join(',')||'var(--card-2) 0 100%')+')"><div><strong>'+fmtBaht(total)+'</strong><small>รายจ่ายเดือนนี้</small></div></div><div class="donut-legend">'+legend+'</div></div>';
+  }
+
+  function disciplineHeatmapHtml(){
+    var end=new Date(today.getFullYear(),today.getMonth(),today.getDate()),start=new Date(end);start.setDate(end.getDate()-370);var marks={};
+    function mark(date,status){var key=date.toISOString().slice(0,10);if(marks[key]!=='late')marks[key]=status;}
+    function scan(items,payments,isLoan){
+      for(var cursor=new Date(start.getFullYear(),start.getMonth(),1);cursor<=end;cursor.setMonth(cursor.getMonth()+1)){
+        var y=cursor.getFullYear(),m=cursor.getMonth(),key=monthKey(y,m);
+        items.forEach(function(item){if(isLoan&&!isLoanActiveInMonth(item,y,m))return;var due=new Date(y,m,Math.min(item.dueDay,daysInMonth(y,m))),pay=(payments[key]||{})[item.id];if(pay&&pay.paid){var paidAt=new Date(pay.paidAt||due);mark(due,paidAt<=due?'ontime':'late');}else if(due<end)mark(due,'late');});
+      }
+    }
+    scan(state.bills,state.payments,false);scan(state.loans,state.loanPayments,true);
+    var cells='';for(var date=new Date(start);date<=end;date.setDate(date.getDate()+1)){var key=date.toISOString().slice(0,10);cells+='<i class="heat-cell '+(marks[key]||'empty')+'" title="'+date.toLocaleDateString('th-TH')+'"></i>';}
+    return '<div class="heat-scroll"><div class="payment-heatmap">'+cells+'</div></div><div class="heat-legend"><span><i class="heat-cell ontime"></i>ตรงเวลา</span><span><i class="heat-cell late"></i>ช้า/ยังไม่จ่าย</span></div>';
+  }
+
+  function reportOverviewHtml(loans){
+    var current=monthPaidTotal(viewYear,viewMonth),prevDate=new Date(viewYear,viewMonth-1,1),previous=monthPaidTotal(prevDate.getFullYear(),prevDate.getMonth());
+    var original=state.loans.reduce(function(sum,l){return sum+Math.max(Number(l.totalAmount||0),Number(l.remaining||0));},0),remaining=state.loans.reduce(function(sum,l){return sum+Number(l.remaining||0);},0),pct=original?Math.max(0,Math.min(100,Math.round((original-remaining)/original*100))):0;
+    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card"><div class="section-kicker">MONTH ON MONTH</div><h3>จ่ายรวมเดือนนี้</h3><div class="report-number">'+fmtBaht(current)+'</div>'+comparisonHtml(current,previous)+'</div><div class="debt-summary-card lifetime-card"><div class="lifetime-ring" style="--progress:'+(pct*3.6)+'deg"><div><strong>'+pct+'%</strong><small>ปลดหนี้แล้ว</small></div></div><p>จากหนี้ทั้งหมดที่เคยมี '+fmtBaht(original)+'</p></div></div><div class="debt-summary-card"><div class="section-kicker">PAYMENT DISCIPLINE</div><h3>วินัยการจ่ายย้อนหลัง 1 ปี</h3>'+disciplineHeatmapHtml()+'</div>';
+  }
+
   function renderDebtSummary(){
     var listArea = document.getElementById('listArea');
     var loans = state.loans.filter(function(loan){return Number(loan.remaining||0)>0;});
     if(!loans.length){
-      listArea.innerHTML = '<div class="empty"><span class="em-emoji">🎉</span>ไม่มีหนี้คงเหลือแล้ว</div>';
+      listArea.innerHTML = '<div class="summary-hero"><div class="summary-eyebrow">รายงานการเงินของคุณ</div><div class="summary-total">฿0</div><div class="summary-caption">ไม่มีหนี้คงเหลือแล้ว 🎉</div></div>'+reportOverviewHtml([]);
       return;
     }
     var totalDebt = loans.reduce(function(sum,loan){return sum+Number(loan.remaining||0);},0);
@@ -591,7 +658,7 @@
     }).join('');
 
     listArea.innerHTML =
-      '<div class="summary-hero"><div class="summary-eyebrow">ภาพรวมหนี้ของคุณ</div><div class="summary-total">'+fmtBaht(totalDebt)+'</div><div class="summary-caption">ยอดหนี้คงเหลือทั้งหมด</div><div class="summary-chips"><span>จ่ายเดือนนี้ <strong>'+fmtBaht(totalPayment)+'</strong></span><span>ดอก/เดือน <strong>'+fmtBaht(monthlyInterest)+'</strong></span></div></div>'+
+      '<div class="summary-hero"><div class="summary-eyebrow">รายงานการเงินของคุณ</div><div class="summary-total">'+fmtBaht(totalDebt)+'</div><div class="summary-caption">ยอดหนี้คงเหลือทั้งหมด</div><div class="summary-chips"><span>จ่ายเดือนนี้ <strong>'+fmtBaht(totalPayment)+'</strong></span><span>ดอก/เดือน <strong>'+fmtBaht(monthlyInterest)+'</strong></span></div></div>'+reportOverviewHtml(loans)+
       '<div class="debt-summary-card"><div class="section-kicker">DEBT MAP</div><h3>หนี้อยู่ตรงไหนบ้าง</h3><div class="debt-bars">'+debtBars+'</div></div>'+
       '<div class="debt-summary-card"><h3>ตัวเลขสำคัญ</h3><div class="debt-summary-grid">'+
         '<div class="debt-metric"><span class="lab">หนี้คงเหลือรวม</span><span class="val">'+fmtBaht(totalDebt)+'</span></div>'+
@@ -752,7 +819,8 @@
     history.sort(function(a,b){return b.month.localeCompare(a.month);});
     var historyBox=document.getElementById('detailPaymentHistory');
     historyBox.innerHTML='<h3>ประวัติการชำระ</h3>'+(history.length?history.map(function(entry){
-      return '<div class="history-item"><div><strong>'+entry.month+'</strong><div class="reason">จ่าย '+fmtBaht(entry.payment.amount)+' · เงินต้น '+fmtBaht(entry.payment.principalAmount||entry.payment.amount)+' · ดอก '+fmtBaht(entry.payment.interestAmount||0)+'</div></div><div class="history-actions"><button data-history-edit="'+entry.month+'">แก้</button><button data-history-delete="'+entry.month+'">ลบ</button></div></div>';
+      var principal=Number(entry.payment.principalAmount||entry.payment.amount||0),interest=Number(entry.payment.interestAmount||0),total=Math.max(1,principal+interest),principalPct=principal/total*100;
+      return '<div class="history-item"><div class="history-main"><strong>'+entry.month+'</strong><div class="reason">จ่าย '+fmtBaht(entry.payment.amount)+' · เงินต้น '+fmtBaht(principal)+' · ดอก '+fmtBaht(interest)+'</div><div class="payment-split" title="เงินต้น '+Math.round(principalPct)+'% · ดอก '+Math.round(100-principalPct)+'%"><i class="split-principal" style="width:'+principalPct+'%"></i><i class="split-interest" style="width:'+(100-principalPct)+'%"></i></div></div><div class="history-actions"><button data-history-edit="'+entry.month+'">แก้</button><button data-history-delete="'+entry.month+'">ลบ</button></div></div>';
     }).join(''):'<div class="reason">ยังไม่มีประวัติการชำระ</div>');
     historyBox.querySelectorAll('[data-history-edit]').forEach(function(button){button.addEventListener('click',function(){
       var key=button.dataset.historyEdit,old=state.loanPayments[key][loan.id];
