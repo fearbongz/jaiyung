@@ -97,6 +97,11 @@
   function isLoanActiveInMonth(loan, year, month){
     return !loan.startMonth || loan.startMonth <= monthKey(year, month);
   }
+  function loanPaymentForMonth(loan, year, month){
+    var overrides = loan.paymentOverrides || {};
+    var override = Number(overrides[monthKey(year,month)]);
+    return Number.isFinite(override) && override>0 ? override : Number(loan.monthlyPayment||0);
+  }
   function daysInMonth(y,m){ return new Date(y, m+1, 0).getDate(); }
   function fmtBaht(n){
     n = Math.round(n||0);
@@ -199,17 +204,22 @@
     activeTab = tab;
     document.getElementById('tabBills').classList.toggle('active', tab==='bills');
     document.getElementById('tabLoans').classList.toggle('active', tab==='loans');
+    document.getElementById('tabSummary').classList.toggle('active', tab==='summary');
     document.getElementById('billsHero').style.display = tab==='bills' ? 'flex' : 'none';
     document.getElementById('loansHero').style.display = tab==='loans' ? 'flex' : 'none';
+    document.getElementById('addBtn').style.display = tab==='summary' ? 'none' : '';
     render();
   }
   document.getElementById('tabBills').addEventListener('click', function(){ setTab('bills'); });
   document.getElementById('tabLoans').addEventListener('click', function(){ setTab('loans'); });
+  document.getElementById('tabSummary').addEventListener('click', function(){ setTab('summary'); });
 
   /* ---------- RENDER ---------- */
   function render(){
     document.getElementById('monthLabel').textContent = MONTH_NAMES[viewMonth] + ' ' + (viewYear+543);
-    if(activeTab==='bills') renderBills(); else renderLoans();
+    if(activeTab==='bills') renderBills();
+    else if(activeTab==='loans') renderLoans();
+    else renderDebtSummary();
   }
 
   function renderBills(){
@@ -234,7 +244,7 @@
     ring.style.strokeDasharray = circumference;
     ring.style.strokeDashoffset = circumference - (circumference * Math.min(pct,100)/100);
 
-    var loansMonthlyTotal = state.loans.filter(function(l){return isLoanActiveInMonth(l,viewYear,viewMonth);}).reduce(function(s,l){return s+Number(l.monthlyPayment||0);},0);
+    var loansMonthlyTotal = state.loans.filter(function(l){return isLoanActiveInMonth(l,viewYear,viewMonth);}).reduce(function(s,l){return s+loanPaymentForMonth(l,viewYear,viewMonth);},0);
 
     if(state.budget){
       document.getElementById('budgetRow').style.display='flex';
@@ -338,15 +348,17 @@
   function renderLoans(){
     var loans = state.loans.filter(function(loan){ return isLoanActiveInMonth(loan,viewYear,viewMonth); });
     var rows = loans.map(function(l){
-      return computeRow(l, l.dueDay, getPayment(state.loanPayments, l.id));
+      var row = computeRow(l, l.dueDay, getPayment(state.loanPayments, l.id));
+      row.monthlyPayment = loanPaymentForMonth(l,viewYear,viewMonth);
+      return row;
     });
 
     var unpaidRows = rows.filter(function(r){return !r.paid;}).sort(function(a,b){return a.due-b.due;});
     var paidRows = rows.filter(function(r){return r.paid;}).sort(function(a,b){return a.due-b.due;});
 
     var totalDebt = loans.reduce(function(s,l){return s+Number(l.remaining||0);},0);
-    var paidThisMonth = paidRows.reduce(function(s,r){return s + Number((r.pay && r.pay.amount) || r.item.monthlyPayment || 0);},0);
-    var remainThisMonth = unpaidRows.reduce(function(s,r){return s + Number(r.item.monthlyPayment||0);},0);
+    var paidThisMonth = paidRows.reduce(function(s,r){return s + Number((r.pay && r.pay.amount) || r.monthlyPayment || 0);},0);
+    var remainThisMonth = unpaidRows.reduce(function(s,r){return s + Number(r.monthlyPayment||0);},0);
     var pct = (paidThisMonth+remainThisMonth)>0 ? Math.round((paidThisMonth/(paidThisMonth+remainThisMonth))*100) : 0;
 
     document.getElementById('debtVal').textContent = fmtBaht(totalDebt);
@@ -369,6 +381,7 @@
 
     function makeLoanEl(r){
       var loan = r.item;
+      var currentPayment = r.monthlyPayment;
       var el = document.createElement('div');
       el.className = 'bill' + (r.paid ? ' paid' : '');
 
@@ -401,12 +414,13 @@
         '<div class="bicon">🏦</div>'+
         '<div class="binfo" style="width:100%;">'+
           '<div class="bname"><span>'+escapeHtml(loan.name)+'</span>'+badgeHtml+'</div>'+
-          '<div class="bdue">งวดนี้ '+dueText(r)+(loan.note? ' · '+escapeHtml(loan.note):'')+'</div>'+
+          '<div class="bdue">'+(loan.bank?escapeHtml(loan.bank)+' · ':'')+'งวดนี้ '+dueText(r)+(loan.note? ' · '+escapeHtml(loan.note):'')+'</div>'+
           progressHtml+
+          '<div class="loan-progress-label"><strong>คงเหลือ '+fmtBaht(loan.remaining)+'</strong> · <strong style="color:var(--coral)">ดอกเบี้ยงวดนี้ประมาณ '+fmtBaht(Number(loan.remaining||0)*(Number(loan.interestRate||0)/1200))+'</strong></div>'+
         '</div>'+
         '<div class="bactions">'+
-          '<div class="bamt">'+fmtBaht(loan.remaining)+'</div>'+
-          '<div class="bamt sub">คงเหลือ</div>'+
+          '<div class="bamt">'+fmtBaht(currentPayment)+'</div>'+
+          '<div class="bamt sub">ต้องจ่ายเดือนนี้</div>'+
           '<button class="paybtn '+(r.paid?'paid':'unpaid')+'" data-action="toggle">'+(r.paid?'จ่ายงวดแล้ว ✓':'จ่ายงวดยัง?')+'</button>'+
         '</div>';
 
@@ -437,6 +451,44 @@
     makeSection('จ่ายงวดแล้ว', paidRows);
   }
 
+  function renderDebtSummary(){
+    var listArea = document.getElementById('listArea');
+    var loans = state.loans.filter(function(loan){return Number(loan.remaining||0)>0;});
+    if(!loans.length){
+      listArea.innerHTML = '<div class="empty"><span class="em-emoji">🎉</span>ไม่มีหนี้คงเหลือแล้ว</div>';
+      return;
+    }
+    var totalDebt = loans.reduce(function(sum,loan){return sum+Number(loan.remaining||0);},0);
+    var totalPayment = loans.filter(function(loan){return isLoanActiveInMonth(loan,viewYear,viewMonth);}).reduce(function(sum,loan){return sum+loanPaymentForMonth(loan,viewYear,viewMonth);},0);
+    var monthlyInterest = loans.reduce(function(sum,loan){return sum+(Number(loan.remaining||0)*Number(loan.interestRate||0)/1200);},0);
+    var avalanche = loans.slice().sort(function(a,b){return Number(b.interestRate||0)-Number(a.interestRate||0) || Number(a.remaining||0)-Number(b.remaining||0);});
+    var snowball = loans.slice().sort(function(a,b){return Number(a.remaining||0)-Number(b.remaining||0);});
+    var expensive = avalanche[0];
+    var smallest = snowball[0];
+
+    function priorityRows(items){
+      return items.map(function(loan,index){
+        var interest = Number(loan.remaining||0)*Number(loan.interestRate||0)/1200;
+        return '<div class="priority-item"><div><span class="rank">#'+(index+1)+'</span><strong>'+escapeHtml(loan.name)+'</strong>'+
+          (loan.bank?' <span class="reason">· '+escapeHtml(loan.bank)+'</span>':'')+
+          '<div class="reason">ดอกเบี้ย '+Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'%/ปี · เสียดอกประมาณ '+fmtBaht(interest)+'/เดือน</div></div>'+
+          '<div style="text-align:right"><strong>'+fmtBaht(loan.remaining)+'</strong><div class="reason">คงเหลือ</div></div></div>';
+      }).join('');
+    }
+
+    listArea.innerHTML =
+      '<div class="debt-summary-card"><h2>ภาพรวมหนี้ทั้งหมด</h2><div class="debt-summary-grid">'+
+        '<div class="debt-metric"><span class="lab">หนี้คงเหลือรวม</span><span class="val">'+fmtBaht(totalDebt)+'</span></div>'+
+        '<div class="debt-metric"><span class="lab">ต้องจ่ายเดือนนี้</span><span class="val">'+fmtBaht(totalPayment)+'</span></div>'+
+        '<div class="debt-metric"><span class="lab">ดอกเบี้ยประมาณ/เดือน</span><span class="val">'+fmtBaht(monthlyInterest)+'</span></div>'+
+        '<div class="debt-metric"><span class="lab">จำนวนหนี้</span><span class="val">'+loans.length+' รายการ</span></div>'+
+      '</div></div>'+
+      '<div class="debt-summary-card"><h3>🎯 แนะนำให้โปะก่อน</h3><p class="reason">แบบ Avalanche: จ่ายขั้นต่ำทุกก้อน แล้วนำเงินที่เหลือไปโปะดอกเบี้ยสูงสุด เพื่อลดดอกเบี้ยรวม</p>'+
+        '<div class="priority-list">'+priorityRows(avalanche)+'</div><p class="reason">ตัวเลขเป็นประมาณการแบบลดต้นลดดอก ควรตรวจค่าปรับปิดก่อนกำหนดและเงื่อนไขจริงกับธนาคารก่อนโปะ</p></div>'+
+      '<div class="debt-summary-card"><h3>คำตอบแบบเร็ว</h3><div class="priority-item"><div><strong>แพงสุด: '+escapeHtml(expensive.name)+'</strong><div class="reason">ดอกเบี้ยสูงสุด '+Number(expensive.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2})+'% ต่อปี</div></div></div>'+
+        '<div class="priority-item"><div><strong>ปิดง่ายสุด: '+escapeHtml(smallest.name)+'</strong><div class="reason">ยอดคงเหลือน้อยสุด '+fmtBaht(smallest.remaining)+' เหมาะถ้าต้องการลดจำนวนเจ้าหนี้เร็ว</div></div></div></div>';
+  }
+
   var currentDetailLoanId = null;
 
   function refreshAfterLoanChange(loan){
@@ -448,7 +500,7 @@
   function handleLoanToggle(loan, r, container){
     if(r.paid){
       if(confirm('ยกเลิกสถานะ "จ่ายงวดแล้ว" ของ '+loan.name+' ใช่ไหม? ยอดคงเหลือจะถูกบวกกลับคืน')){
-        var amt = Number((r.pay && r.pay.amount) || loan.monthlyPayment || 0);
+        var amt = Number((r.pay && r.pay.amount) || r.monthlyPayment || loan.monthlyPayment || 0);
         var principalPaid = Number(r.pay && r.pay.principalAmount);
         loan.remaining = Number(loan.remaining||0) + (Number.isFinite(principalPaid) ? principalPaid : amt);
         setPayment(state.loanPayments, loan.id, null);
@@ -460,7 +512,7 @@
     var row = document.createElement('div');
     row.className = 'confirm-row';
     row.innerHTML =
-      '<input type="number" value="'+loan.monthlyPayment+'" min="0" step="1">'+
+      '<input type="number" value="'+(r.monthlyPayment||loanPaymentForMonth(loan,viewYear,viewMonth))+'" min="0" step="1">'+
       '<button class="ok">ยืนยันจ่ายงวดแล้ว</button>'+
       '<button class="cancel">ยกเลิก</button>'+
       '<div class="hint">ระบบจะหักดอกเบี้ยของงวดก่อน แล้วนำส่วนที่เหลือไปลดเงินต้น</div>';
@@ -468,7 +520,7 @@
     row.querySelector('input').focus();
     row.querySelector('.ok').addEventListener('click', function(ev){
       ev.stopPropagation();
-      var amt = Number(row.querySelector('input').value) || loan.monthlyPayment;
+      var amt = Number(row.querySelector('input').value) || r.monthlyPayment || loanPaymentForMonth(loan,viewYear,viewMonth);
       var breakdown = loanPaymentBreakdown(loan, amt);
       if(Number(loan.remaining||0)>0 && breakdown.principal<=0){
         alert('ยอดชำระต้องสูงกว่าดอกเบี้ยงวดนี้ ('+fmtBaht(breakdown.interest)+') เพื่อให้เงินต้นลดลง');
@@ -534,7 +586,7 @@
 
     document.getElementById('detailTotal').textContent = (loan.totalAmount && loan.totalAmount>0) ? fmtBaht(loan.totalAmount) : 'ไม่ระบุ';
     document.getElementById('detailPaidOffPct').textContent = (loan.totalAmount && loan.totalAmount>0) ? pct+'%' : 'ไม่ระบุ';
-    document.getElementById('detailMonthly').textContent = fmtBaht(loan.monthlyPayment);
+    document.getElementById('detailMonthly').textContent = fmtBaht(loanPaymentForMonth(loan,viewYear,viewMonth));
     document.getElementById('detailInterestRate').textContent = Number(loan.interestRate||0).toLocaleString('th-TH',{maximumFractionDigits:2}) + '% ต่อปี';
     if(loan.startMonth){
       var startParts = loan.startMonth.split('-');
@@ -716,9 +768,12 @@
     editingLoanId = null;
     document.getElementById('loanSheetTitle').textContent = 'เพิ่มสินเชื่อใหม่';
     document.getElementById('lName').value = '';
+    document.getElementById('lBank').value = '';
     document.getElementById('lTotal').value = '';
     document.getElementById('lRemaining').value = '';
     document.getElementById('lMonthly').value = '';
+    document.getElementById('lMonthOverride').value = '';
+    document.getElementById('lMonthOverrideNote').textContent = 'กำหนดค่างวดเฉพาะ'+MONTH_NAMES[viewMonth]+' '+(viewYear+543)+' หากเดือนนี้ต่างจากค่างวดปกติ';
     document.getElementById('lInterestRate').value = '';
     document.getElementById('lStartMonth').value = monthKey(today.getFullYear(),today.getMonth());
     document.getElementById('lDueDay').value = '';
@@ -731,9 +786,12 @@
     editingLoanId = loan.id;
     document.getElementById('loanSheetTitle').textContent = 'แก้ไขสินเชื่อ';
     document.getElementById('lName').value = loan.name;
+    document.getElementById('lBank').value = loan.bank || '';
     document.getElementById('lTotal').value = loan.totalAmount || '';
     document.getElementById('lRemaining').value = loan.remaining;
     document.getElementById('lMonthly').value = loan.monthlyPayment;
+    document.getElementById('lMonthOverride').value = (loan.paymentOverrides||{})[monthKey(viewYear,viewMonth)] || '';
+    document.getElementById('lMonthOverrideNote').textContent = 'กำหนดค่างวดเฉพาะ'+MONTH_NAMES[viewMonth]+' '+(viewYear+543)+' หากเดือนนี้ต่างจากค่างวดปกติ';
     document.getElementById('lInterestRate').value = Number(loan.interestRate)||0;
     document.getElementById('lStartMonth').value = loan.startMonth || '';
     document.getElementById('lDueDay').value = loan.dueDay;
@@ -747,9 +805,11 @@
 
   document.getElementById('saveLoanBtn').addEventListener('click', function(){
     var name = document.getElementById('lName').value.trim();
+    var bank = document.getElementById('lBank').value;
     var totalAmount = Number(document.getElementById('lTotal').value) || 0;
     var remaining = Number(document.getElementById('lRemaining').value) || 0;
     var monthlyPayment = Number(document.getElementById('lMonthly').value) || 0;
+    var monthOverride = Number(document.getElementById('lMonthOverride').value) || 0;
     var interestRate = Math.min(100, Math.max(0, Number(document.getElementById('lInterestRate').value) || 0));
     var enteredStartMonth = document.getElementById('lStartMonth').value;
     var dueDay = Math.min(31, Math.max(1, Number(document.getElementById('lDueDay').value) || 1));
@@ -758,10 +818,17 @@
 
     if(editingLoanId){
       var l = state.loans.find(function(x){return x.id===editingLoanId;});
-      if(l){ l.name=name; l.totalAmount=totalAmount; l.remaining=remaining; l.monthlyPayment=monthlyPayment; l.interestRate=interestRate; l.startMonth=enteredStartMonth || l.addedMonth || null; l.dueDay=dueDay; l.note=note; }
+      if(l){
+        l.name=name; l.bank=bank; l.totalAmount=totalAmount; l.remaining=remaining; l.monthlyPayment=monthlyPayment; l.interestRate=interestRate; l.startMonth=enteredStartMonth || l.addedMonth || null; l.dueDay=dueDay; l.note=note;
+        if(!l.paymentOverrides) l.paymentOverrides={};
+        if(monthOverride>0) l.paymentOverrides[monthKey(viewYear,viewMonth)]=monthOverride;
+        else delete l.paymentOverrides[monthKey(viewYear,viewMonth)];
+      }
     } else {
       var addedMonth = monthKey(today.getFullYear(),today.getMonth());
-      state.loans.push({id:uid(), name:name, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, interestRate:interestRate, addedMonth:addedMonth, startMonth:enteredStartMonth || addedMonth, dueDay:dueDay, note:note});
+      var overrides={};
+      if(monthOverride>0) overrides[monthKey(viewYear,viewMonth)]=monthOverride;
+      state.loans.push({id:uid(), name:name, bank:bank, totalAmount:totalAmount, remaining:remaining, monthlyPayment:monthlyPayment, paymentOverrides:overrides, interestRate:interestRate, addedMonth:addedMonth, startMonth:enteredStartMonth || addedMonth, dueDay:dueDay, note:note});
     }
     saveState();
     loanOverlay.classList.remove('show');
