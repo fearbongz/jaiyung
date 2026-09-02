@@ -70,11 +70,11 @@
   body{
     background:var(--paper);
     color:var(--ink);
-    font-family:'IBM Plex Sans Thai', 'Segoe UI', sans-serif;
+    font-family:'Sarabun', 'Tahoma', sans-serif;
     min-height:100vh;
     -webkit-font-smoothing:antialiased;
   }
-  .display{font-family:'Chonburi','IBM Plex Sans Thai',sans-serif;}
+  .display{font-family:'Sarabun','Tahoma',sans-serif;font-weight:800;}
 
   .wrap{
     max-width:520px;
