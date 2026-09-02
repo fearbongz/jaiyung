@@ -633,9 +633,18 @@
     return '<div class="expense-donut-wrap"><div class="expense-donut" style="background:conic-gradient('+(stops.join(',')||'var(--card-2) 0 100%')+')"><div><strong>'+fmtBaht(total)+'</strong><small>รายจ่ายเดือนนี้</small></div></div><div class="donut-legend">'+legend+'</div></div>';
   }
 
+  function loanDonutHtml(){
+    var key=monthKey(viewYear,viewMonth),entries=[],total=0,colors=['var(--plum)','var(--mustard)','var(--sky)','var(--mint)','var(--coral)','#9b7653'];
+    state.loans.forEach(function(loan){var pay=(state.loanPayments[key]||{})[loan.id];if(!pay||!pay.paid)return;var amount=Number(pay.amount||0);entries.push({name:loan.name,bank:loan.bank||'',amount:amount});total+=amount;});
+    entries.sort(function(a,b){return b.amount-a.amount;});var cursor=0,stops=[];
+    entries.forEach(function(entry,index){var end=cursor+(total?entry.amount/total*100:0);stops.push(colors[index%colors.length]+' '+cursor+'% '+end+'%');cursor=end;});
+    var legend=entries.length?entries.map(function(entry,index){return '<div class="donut-row"><span><i style="background:'+colors[index%colors.length]+'"></i>'+escapeHtml(entry.name)+(entry.bank?' <small>'+escapeHtml(entry.bank)+'</small>':'')+'</span><strong>'+fmtBaht(entry.amount)+'</strong></div>';}).join(''):'<div class="donut-empty">ยังไม่มีค่างวดที่บันทึกว่าจ่ายแล้ว</div>';
+    return '<div class="expense-donut-wrap"><div class="expense-donut loan-donut" style="background:conic-gradient('+(stops.join(',')||'var(--card-2) 0 100%')+')"><div><strong>'+fmtBaht(total)+'</strong><small>ค่างวดเดือนนี้</small></div></div><div class="donut-legend">'+legend+'</div></div>';
+  }
+
   function reportOverviewHtml(loans){
     var current=monthPaidTotal(viewYear,viewMonth),prevDate=new Date(viewYear,viewMonth-1,1),previous=monthPaidTotal(prevDate.getFullYear(),prevDate.getMonth());
-    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3>'+expenseDonutHtml()+'</div><div class="debt-summary-card report-wide month-compare"><div><div class="section-kicker">MONTH ON MONTH</div><h3>เทียบค่าใช้จ่ายเดือนก่อน</h3></div>'+comparisonHtml(current,previous)+'</div></div>';
+    return '<div class="report-grid"><div class="debt-summary-card report-wide"><div class="section-kicker">MONTHLY SPENDING</div><h3>รายจ่ายไปไหนบ้าง</h3><div class="spending-donuts"><section><h4>บิลรายเดือน</h4>'+expenseDonutHtml()+'</section><section><h4>ค่างวดสินเชื่อ</h4>'+loanDonutHtml()+'</section></div></div><div class="debt-summary-card report-wide month-compare"><div><div class="section-kicker">MONTH ON MONTH</div><h3>เทียบค่าใช้จ่ายเดือนก่อน</h3></div>'+comparisonHtml(current,previous)+'</div></div>';
   }
 
   function renderDebtSummary(){
