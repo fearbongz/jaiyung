@@ -360,8 +360,15 @@
     overflow-y:auto;
     overscroll-behavior:contain;
     -webkit-overflow-scrolling:touch;
+    scrollbar-width:thin;
+    scrollbar-color:var(--plum) transparent;
     animation: slideup 0.22s ease-out;
   }
+  .sheet::-webkit-scrollbar{width:7px;}
+  .sheet::-webkit-scrollbar-track{background:transparent;margin:16px 0;}
+  .sheet::-webkit-scrollbar-thumb{background:var(--plum);border-radius:20px;border:2px solid var(--paper);}
+  .sheet::-webkit-scrollbar-thumb:hover{background:var(--coral);}
+  .sheet::-webkit-scrollbar-button{display:none;width:0;height:0;}
   @keyframes slideup{ from{transform:translateY(24px); opacity:0;} to{transform:translateY(0); opacity:1;} }
   .sheet h2{margin:0 0 16px; font-size:20px;}
   .field{margin-bottom:14px;}
