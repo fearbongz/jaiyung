@@ -35,6 +35,28 @@
     };
   }
 
+  function withConnectionTimeout(operation){
+    var timer;
+    return Promise.race([
+      operation,
+      new Promise(function(resolve,reject){
+        timer=setTimeout(function(){
+          reject(new Error('การเชื่อมต่อใช้เวลานานเกินไป กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่'));
+        },15000);
+      })
+    ]).finally(function(){clearTimeout(timer);});
+  }
+
+  function showConnectionError(error){
+    showLoginScreen();
+    setLockError('เชื่อมต่อระบบหลังบ้านไม่ได้: ' + error.message);
+    var retryButton=document.createElement('button');
+    retryButton.className='btn ghost';
+    retryButton.textContent='ลองเชื่อมต่อใหม่';
+    retryButton.addEventListener('click',function(){window.location.reload();});
+    lockContent.appendChild(retryButton);
+  }
+
   var supabaseClient = null;
   function getSupabaseClient(){
     if(supabaseClient) return supabaseClient;
@@ -1209,15 +1231,14 @@
 
   async function showApp(){
     try{
-      state = await loadState();
+      state = await withConnectionTimeout(loadState());
       document.body.classList.remove('app-locked');
       lockOverlay.classList.remove('show');
       setTab(activeTab);
       checkDueNotifications();
     }catch(error){
       currentAccount = null;
-      showLoginScreen();
-      setLockError(error.message);
+      showConnectionError(error);
     }
   }
 
@@ -1310,13 +1331,12 @@
     lockOverlay.classList.add('show');
     lockContent.innerHTML = '<h2>กำลังโหลด…</h2><p>กำลังเชื่อมต่อระบบหลังบ้าน</p>';
     try{
-      var result = await getSupabaseClient().auth.getSession();
+      var result = await withConnectionTimeout(getSupabaseClient().auth.getSession());
       if(result.error) throw result.error;
       currentAccount = result.data.session ? {username:result.data.session.user.email,userId:result.data.session.user.id} : null;
       if(currentAccount){if(hasPin())showPinScreen();else await showApp();}else showLoginScreen();
     }catch(error){
-      showLoginScreen();
-      setLockError('เชื่อมต่อระบบหลังบ้านไม่ได้: ' + error.message);
+      showConnectionError(error);
     }
   }
 
