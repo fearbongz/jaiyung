@@ -143,6 +143,7 @@
     <div class="field">
       <label>ยอดประมาณ (บาท)</label>
       <input type="number" id="fAmount" placeholder="0" min="0" step="1">
+      <div class="subnote">เมื่อแก้ไขบิล ยอดเงินจะเปลี่ยนเฉพาะเดือนที่เปิดอยู่ ส่วนชื่อและรายละเอียดบิลใช้ร่วมกันทุกเดือน</div>
     </div>
     <div class="field">
       <label>ครบกำหนดวันที่ (1–31 ของเดือน)</label>
@@ -196,10 +197,6 @@
     <div class="field">
       <label>ค่างวดต่อเดือน (บาท)</label>
       <input type="number" id="lMonthly" placeholder="0" min="0" step="1">
-    </div>
-    <div class="field">
-      <label>ค่างวดเฉพาะเดือนที่กำลังดู — ไม่บังคับ</label>
-      <input type="number" id="lMonthOverride" placeholder="ใช้ค่างวดปกติ" min="0" step="1">
       <div class="subnote" id="lMonthOverrideNote">ใช้กับสินเชื่อแบบขั้นบันได ใส่เฉพาะเดือนที่ยอดต่างจากปกติ</div>
     </div>
     <div class="field">
